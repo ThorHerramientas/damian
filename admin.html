@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>🔒 Panel de administración - Solo personal autorizado</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root{
+      --amarillo:#ffd600;
+      --primario:#1976d2;
+      --rojo:#c62828;
+      --gris:#e0e0e0;
+      --borde:#ddd;
+      --texto:#333;
+    }
+    body {
+      background-color: #f5f5f5;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      color: var(--texto);
+    }
+    header.header {
+      background-color: var(--amarillo);
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      gap: 8px;
+      box-sizing: border-box;
+    }
+    header.header h1 {
+      margin: 0;
+      font-size: 20px;
+    }
+    header.header p {
+      margin: 0;
+      font-size: 13px;
+    }
+    .btn-principal {
+      background-color: var(--primario);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .btn-principal:hover { filter: brightness(0.95); }
+    .btn-secundario {
+      background-color: var(--gris);
+      border: none;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-secundario:hover { filter: brightness(0.95); }
+
+    main.admin-container {
+      max-width: 1000px;
+      margin: 16px auto;
+      background-color: #fff;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--borde);
+      box-sizing: border-box;
+    }
+    .admin-container h1 { font-size: 22px; margin: 0 0 8px; }
+
+    .admin-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 16px;
+      margin-bottom: 10px;
+    }
+    .admin-form label {
+      font-size: 13px;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 3px;
+    }
+    .admin-form input,
+    .admin-form textarea,
+    .admin-form select {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+    .admin-form textarea { min-height: 60px; resize: vertical; }
+    .admin-form-full { grid-column: 1 / 3; }
+    .admin-buttons { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 10px; }
+
+    /* Buscador admin */
+    .admin-buscador {
+      display: flex;
+      justify-content: center;
+      margin: 16px 0 6px;
+      position: relative;
+    }
+    .admin-buscador input {
+      width: 100%;
+      max-width: 520px;
+      padding: 10px 40px 10px 14px;
+      font-size: 15px;
+      border: 1px solid #ccc;
+      border-radius: 999px;
+      outline: none;
+    }
+    .admin-buscador svg {
+      position: absolute;
+      right: calc(50% - 260px + 12px);
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px; height: 18px;
+      color: #777;
+      pointer-events: none;
+    }
+
+    .tabla-wrapper { width: 100%; overflow-x: auto; }
+    table.admin-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 8px;
+      min-width: 600px;
+    }
+    .admin-table thead { background-color: #f5f5f5; }
+    .admin-table th, .admin-table td {
+      border: 1px solid var(--borde);
+      padding: 6px 8px;
+      text-align: left;
+      box-sizing: border-box;
+    }
+    .admin-table-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .btn-pequeño { padding: 4px 8px; font-size: 12px; }
+
+    footer.footer { text-align: center; padding: 12px; font-size: 12px; color: #555; }
+    .oculto { display: none; }
+
+    /* LOGIN */
+    .login-overlay {
+      position: fixed; inset: 0;
+      background: radial-gradient(circle at top, #ffffff 0, #f2f2f2 55%, #e0e0e0 100%);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    .login-card {
+      background: #ffffff; border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+      padding: 20px 22px; max-width: 360px; width: 90%;
+      box-sizing: border-box; text-align: center; border-top: 4px solid var(--rojo);
+    }
+    .login-icon {
+      width: 48px; height: 48px; border-radius: 50%;
+      border: 2px solid var(--rojo);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 10px; color: var(--rojo); font-size: 24px;
+    }
+    .login-card h2 { margin: 0 0 4px; font-size: 20px; text-transform: uppercase; color: var(--rojo); }
+    .login-card h3 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; color: #333; }
+    .login-card p { margin: 0 0 14px; font-size: 13px; color: #555; }
+    .login-card label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px; text-align: left; }
+    .login-card input[type="password"] {
+      width: 100%; padding: 8px 10px; border-radius: 999px;
+      border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; margin-bottom: 6px;
+    }
+    .login-error { color: var(--rojo); font-size: 12px; min-height: 16px; margin-bottom: 6px; text-align: left; }
+    .login-btn { width: 100%; padding: 8px 12px; border-radius: 999px; border: none; background-color: var(--primario); color: #fff; font-size: 14px; cursor: pointer; }
+    .login-btn:hover { filter: brightness(0.95); }
+    .login-note { font-size: 11px; color: #777; margin-top: 8px; }
+
+    /* Preview imagen subida */
+    .preview-contenedor {
+      margin-top: 6px; border: 1px solid var(--borde);
+      padding: 6px; border-radius: 4px; background-color: #fafafa;
+    }
+    .preview-contenedor img {
+      max-width: 100%; max-height: 140px; display: block; margin: 4px auto 0; object-fit: contain;
+    }
+    .estado-subida { font-size: 12px; margin-top: 4px; }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      header.header { flex-direction: column; align-items: flex-start; }
+      header.header h1 { font-size: 18px; }
+      main.admin-container { margin: 10px; padding: 12px; }
+      .admin-form { grid-template-columns: 1fr; }
+      .admin-form-full { grid-column: 1 / 2; }
+      .admin-buscador svg {
+        right: 16px;
+      }
+    }
+
+
+
+
+/* ======= ADMIN: ESTADÍSTICAS ======= */
+.admin-stats{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap:12px;
+  margin: 6px 0 12px;
+}
+.admin-stats .stat{
+  background:#fff; border:1px solid var(--borde); border-radius:10px;
+  padding:12px; display:flex; flex-direction:column; gap:4px;
+}
+.stat-label{ font-size:13px; color:#555; }
+.stat-value{ font-size:20px; font-weight:800; color:#222; }
+
+@media (max-width: 900px){
+  .admin-stats{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 520px){
+  .admin-stats{ grid-template-columns: 1fr; }
+}
+
+
+
+
+  </style>
+</head>
+<body>
+<header class="header">
+  <div>
+    <h1>Panel de administración</h1>
+    <p>Gestión de productos - Thor Herramientas</p>
+  </div>
+  <div>
+    <a href="index.html" class="btn-principal">Ver tienda</a>
+  </div>
+</header>
+
+<!-- LOGIN -->
+<div id="login-overlay" class="login-overlay">
+  <div class="login-card">
+    <div class="login-icon">🔒</div>
+    <h2>Acceso restringido</h2>
+    <h3>Solo personal autorizado</h3>
+    <p>Este panel permite modificar precios, stock y productos de la tienda.</p>
+    <form id="admin-login-form">
+      <label for="admin-password-input">Contraseña de administrador</label>
+      <input type="password" id="admin-password-input" autocomplete="off" required>
+      <div id="admin-login-error" class="login-error"></div>
+      <button type="submit" class="login-btn">Ingresar</button>
+      <div class="login-note">Si no sos parte del personal autorizado, cerrá esta página.</div>
+    </form>
+  </div>
+</div>
+
+<!-- PANEL -->
+<main id="admin-main" class="admin-container oculto">
+  <h1>Productos</h1>
+  <p style="font-size:13px;margin-bottom:10px;">
+    Desde acá podés agregar, editar o eliminar productos. Los cambios se guardan en Firestore y se ven en la tienda.
+  </p>
+
+  <form id="form-producto" class="admin-form">
+    <input type="hidden" id="prod-id">
+
+    <div>
+      <label for="prod-nombre">Nombre</label>
+      <input type="text" id="prod-nombre" required>
+    </div>
+
+    <div>
+      <label for="prod-marca">Marca</label>
+      <input type="text" id="prod-marca">
+    </div>
+
+    <div>
+      <label for="prod-precio">Precio (ARS)</label>
+      <input type="number" id="prod-precio" min="0" step="1" required>
+    </div>
+
+    <div>
+      <label for="prod-stock">Stock</label>
+      <input type="number" id="prod-stock" min="0" step="1" required>
+    </div>
+
+    <div>
+      <label for="prod-categoria">Categoría (opcional)</label>
+      <input type="text" id="prod-categoria">
+    </div>
+
+    <div>
+      <label for="prod-inalambrico">Inalámbrico</label>
+      <select id="prod-inalambrico">
+        <option value="false">Con cable</option>
+        <option value="true">Inalámbrico</option>
+      </select>
+    </div>
+
+    <!-- Imagen: subida + URL -->
+    <div class="admin-form-full">
+      <label>Imagen del producto</label>
+      <input type="file" id="prod-imagen-archivo" accept="image/*">
+      <small>O pegá una URL directa (o varias separadas por coma):</small>
+      <input type="text" id="prod-imagen" placeholder="https://... , https://...">
+      <div id="preview-contenedor" class="preview-contenedor oculto">
+        <span style="font-size:12px;color:#555;">Vista previa (1ª imagen):</span>
+        <img id="preview-imagen" src="" alt="Vista previa">
+      </div>
+      <div id="estado-subida" class="estado-subida"></div>
+    </div>
+
+    <div class="admin-form-full">
+      <label for="prod-descripcion">Descripción corta</label>
+      <textarea id="prod-descripcion"></textarea>
+    </div>
+
+    <div class="admin-form-full">
+      <label for="prod-envios">Opciones de envío (separadas por coma)</label>
+      <input type="text" id="prod-envios" placeholder="Envío a domicilio, Retiro en el local, Envío a todo el país">
+    </div>
+
+    <div class="admin-form-full">
+      <label for="prod-detalles">Detalles (una característica por línea)</label>
+      <textarea id="prod-detalles" placeholder="Potencia: 600W&#10;Incluye maletín&#10;Garantía: 1 año"></textarea>
+    </div>
+
+    <div class="admin-form-full admin-buttons">
+      <button type="submit" class="btn-principal">Guardar producto</button>
+      <button type="button" id="btn-limpiar-form" class="btn-secundario">Limpiar formulario</button>
+    </div>
+  </form>
+
+  <!-- 🔍 Buscador de productos (ADMIN) -->
+  <div class="admin-buscador">
+    <input type="text" id="buscador-admin" placeholder="Buscar producto por nombre o marca...">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+  </div>
+
+
+
+
+<!-- 📊 Estadísticas -->
+<section id="admin-stats" class="admin-stats">
+  <div class="stat">
+    <span class="stat-label">📦 Productos totales</span>
+    <span id="stat-total" class="stat-value">—</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">⚙️ Activos (stock &gt; 0)</span>
+    <span id="stat-activos" class="stat-value">—</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">⛔ Agotados</span>
+    <span id="stat-agotados" class="stat-value">—</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">💰 Valor total de stock</span>
+    <span id="stat-valor" class="stat-value">—</span>
+  </div>
+</section>
+
+
+
+
+
+  <h2 style="font-size:18px;margin:6px 0 8px;">Listado de productos</h2>
+
+  <div class="tabla-wrapper">
+    <table class="admin-table">
+      <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Marca</th>
+        <th>Precio</th>
+        <th>Stock</th>
+        <th>Inalámbrico</th>
+        <th>Acciones</th>
+      </tr>
+      </thead>
+      <tbody id="tabla-productos-body">
+      <!-- filas desde admin.js -->
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<footer class="footer">
+  © 2025 Thor Herramientas - Panel de administración
+</footer>
+
+<!-- Firebase compat -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyC7oF4s3Fqy7EvjjAWxNxfPdPnmECEzQ",
+    authDomain: "thorherramientas1.firebaseapp.com",
+    projectId: "thorherramientas1",
+    storageBucket: "thorherramientas1.firebasestorage.app",
+    messagingSenderId: "1027910604929",
+    appId: "1:1027910604929:web:9fb7a59ebba2425da31580",
+    measurementId: "G-P4WMW6BBJD"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+
+  const ADMIN_PASSWORD = "thor2025"; // cambiá esta clave cuando quieras
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const loginOverlay = document.getElementById("login-overlay");
+    const adminMain = document.getElementById("admin-main");
+    const formLogin = document.getElementById("admin-login-form");
+    const inputPass = document.getElementById("admin-password-input");
+    const errorBox = document.getElementById("admin-login-error");
+
+    // Login simple (sesión memoria)
+    if (sessionStorage.getItem("adminLogged") === "true") {
+      loginOverlay.style.display = "none";
+      adminMain.classList.remove("oculto");
+    }
+
+    formLogin.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const pass = inputPass.value.trim();
+      if (pass === ADMIN_PASSWORD) {
+        sessionStorage.setItem("adminLogged", "true");
+        loginOverlay.style.display = "none";
+        adminMain.classList.remove("oculto");
+      } else {
+        errorBox.textContent = "Contraseña incorrecta.";
+        inputPass.value = "";
+        inputPass.focus();
+      }
+    });
+
+    // --------- SUBIDA DE IMAGEN A STORAGE ---------
+    const archivoInput = document.getElementById("prod-imagen-archivo");
+    const urlInput = document.getElementById("prod-imagen");
+    const estado = document.getElementById("estado-subida");
+    const previewImg = document.getElementById("preview-imagen");
+    const previewBox = document.getElementById("preview-contenedor");
+
+    if (archivoInput) {
+      archivoInput.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+          estado.textContent = "Subiendo imagen...";
+          estado.style.color = "#333";
+          previewBox.classList.add("oculto");
+
+          const nombreLimpio = file.name.replace(/\s+/g, "-").toLowerCase();
+          const ref = storage.ref().child(`productos/${Date.now()}-${nombreLimpio}`);
+          const snapshot = await ref.put(file);
+          const downloadURL = await snapshot.ref.getDownloadURL();
+
+          // si ya había URLs, agregamos coma y la nueva
+          if (urlInput.value.trim().length > 0) {
+            urlInput.value = urlInput.value.trim() + ", " + downloadURL;
+          } else {
+            urlInput.value = downloadURL;
+          }
+
+          previewImg.src = downloadURL;
+          previewBox.classList.remove("oculto");
+
+          estado.textContent = "Imagen subida correctamente.";
+          estado.style.color = "#2e7d32";
+        } catch (err) {
+          console.error("Error subiendo imagen:", err);
+          estado.textContent = "Error al subir la imagen. Probá nuevamente.";
+          estado.style.color = "#c62828";
+        }
+      });
+    }
+  });
+</script>
+
+<script src="admin.js"></script>
+</body>
+</html>

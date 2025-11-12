@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Thor Herramientas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <h1>Thor Herramientas</h1>
+            <p>Tu pasion, nuestra potencia</p>
+        </div>
+
+        <div class="header-right">
+            <button class="cart-button" id="btn-ver-carrito">
+                🛒 <span>Carrito</span>
+                <span id="cart-count">0</span>
+            </button>
+        </div>
+    </header>
+
+    <nav class="filtros">
+        <div class="filtros-buscador">
+            <input type="text" id="buscador" placeholder="Buscar herramienta...">
+        </div>
+        
+        <div class="filtros-wrapper">
+            <button class="btn-filtros" id="btn-toggle-filtros">
+                Filtros ▾
+            </button>
+
+            <div id="filtros-contenido" class="filtros-contenido oculto">
+                <select id="filtro-marca">
+                    <option value="todas">Todas las marcas</option>
+                </select>
+
+                <select id="filtro-inalambrico">
+                    <option value="todos">Con y sin cable</option>
+                    <option value="si">Solo inalámbricas</option>
+                    <option value="no">Solo con cable</option>
+                </select>
+
+                <select id="orden-precio">
+                    <option value="relevancia">Ordenar por: Relevancia</option>
+                    <option value="precio-asc">Precio: menor a mayor</option>
+                    <option value="precio-desc">Precio: mayor a menor</option>
+                </select>
+            </div>
+        </div>
+    </nav>
+
+    <main class="contenedor">
+        <section id="lista-productos" class="lista-productos">
+            </section>
+    </main>
+
+    <div id="carrito-backdrop" class="carrito-backdrop oculto"></div>
+
+    <aside id="carrito-panel" class="carrito-panel oculto">
+        <div class="carrito-header">
+            <h2>Tu carrito</h2>
+            <button id="btn-cerrar-carrito" class="btn-cerrar-carrito">✕</button>
+        </div>
+
+        <div id="carrito-items" class="carrito-items">
+            </div>
+
+        <div class="carrito-footer">
+            <p class="carrito-total-text">
+                Total: <span id="carrito-total">$ 0</span>
+            </p>
+
+            <div class="carrito-envio">
+                <label for="select-envio">Opción de envío:</label>
+                <select id="select-envio">
+                    <option value="">Seleccionar...</option>
+                    <option value="Retiro en el local">Retiro en el local</option>
+                    <option value="Envío a domicilio">Cotizar envío</option>
+                    <option value="Envío a todo el país">Consultar envios al interior</option>
+                </select>
+            </div>
+
+            <div class="carrito-acciones">
+                <button id="btn-vaciar-carrito" class="btn-secundario">
+                    Vaciar carrito
+                </button>
+                <a id="btn-finalizar-compra" class="btn-principal deshabilitado" href="#">
+                    Confirmar compra por WhatsApp
+                </a>
+            </div>
+
+            <p class="carrito-ayuda">
+                * En el mensaje podés coordinar forma de pago, envío y cualquier duda con el vendedor.
+            </p>
+        </div>
+    </aside>
+
+    <div id="detalle-backdrop" class="detalle-backdrop oculto"></div>
+    <aside id="detalle-panel" class="detalle-panel oculto">
+        </aside>
+
+   <footer style="text-align:center; padding:15px; background:#222; color:white;">
+    <p>© 2025 Thor Herramientas</p>
+    <p>
+        📞 
+        <a href="tel:+5491156465544" style="color:#ffd600; text-decoration:none; font-weight:bold;">
+            +54 9 11 5646 5544
+        </a>
+    </p>
+</footer>
+
+
+    <script src="script.js"></script>
+
+
+
+
+<div id="imagen-ampliada-backdrop" class="oculto" style="
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+">
+    <div style="position: relative; text-align:center;">
+        <img id="imagen-ampliada" src="" alt="" style="
+            max-width: 95vw; max-height: 90vh; border-radius: 10px;
+        ">
+        <button id="cerrar-imagen" style="
+            position: absolute; top: -30px; right: -30px;
+            background: #fff; border: none; border-radius: 50%;
+            font-size: 20px; width: 35px; height: 35px; cursor: pointer;
+        ">✕</button>
+    </div>
+</div>
+
+
+
+
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyC7oF4s3Fqy7EvjjAWxNxfPdPnmECEzQ",
+        authDomain: "thorherramientas1.firebaseapp.com",
+        projectId: "thorherramientas1",
+        storageBucket: "thorherramientas1.firebasestorage.app",
+        messagingSenderId: "1027910604929",
+        appId: "1:1027910604929:web:9fb7a59ebba2425da31580",
+        measurementId: "G-P4WMW6BBJD"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+</script>
+
+</body>
+</html>

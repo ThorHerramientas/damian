@@ -1,0 +1,723 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+/* HEADER */
+.header {
+    background-color: #ffd600; /* amarillo tipo Mercado Libre */
+    padding: 15px 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.logo h1 {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.logo p {
+    font-size: 14px;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Contenedor del botón de filtros + menú */
+.filtros-wrapper {
+    position: relative; /* Importante para que el dropdown se posicione */
+}
+
+/* BOTÓN CARRITO */
+.cart-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    background-color: #fff;
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.cart-button #cart-count {
+    background-color: #3483fa;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+}
+
+/* BOTÓN FILTROS */
+.btn-filtros {
+    border: none;
+    background-color: #fff;
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    white-space: nowrap; 
+}
+
+/* BARRA DEL BUSCADOR + FILTROS (Desktop) */
+.filtros {
+    padding: 12px 20px;
+    background-color: #fff;
+    border-bottom: 1px solid #ddd;
+    /* Usamos Flexbox para alinear buscador y filtros */
+    display: flex;
+    justify-content: center; 
+    gap: 15px; 
+}
+
+.filtros-buscador {
+    flex-grow: 1; 
+    max-width: 600px; 
+}
+
+.filtros-buscador input {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+/* MENÚ DESPLEGABLE DE FILTROS (debajo del botón "Filtros") */
+.filtros-contenido {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0; 
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 230px;
+    z-index: 120;
+}
+
+.filtros-contenido select {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+/* LISTA DE PRODUCTOS */
+.contenedor {
+    padding: 20px;
+}
+
+.lista-productos {
+    display: grid;
+    /* Grid default para escritorio */
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 15px;
+}
+
+/* TARJETA PRODUCTO */
+.tarjeta-producto {
+    background-color: #fff;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: box-shadow 0.2s ease, transform 0.1s ease;
+    cursor: pointer;
+}
+
+.tarjeta-producto:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+.tarjeta-producto img {
+    max-width: 100%;
+    height: 170px;
+    object-fit: contain;
+    margin: 0 auto;
+}
+
+.tarjeta-producto h3 {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.descripcion {
+    font-size: 14px;
+    color: #555;
+}
+
+.precio {
+    font-size: 18px;
+    font-weight: 700;
+    color: #00a650; /* verde precio */
+}
+
+.envios {
+    font-size: 12px;
+    color: #666;
+}
+
+.envios span {
+    display: inline-block;
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin: 2px 4px 0 0;
+}
+
+.stock {
+    font-size: 13px;
+    color: #777;
+}
+
+/* CONTENEDOR DE BOTONES EN LA TARJETA */
+.btn-agregar-contenedor {
+    margin-top: auto;
+}
+
+.acciones-producto {
+    display: flex;
+    gap: 8px;
+}
+
+.acciones-producto button {
+    flex: 1;
+}
+
+/* BOTONES GENERALES */
+.btn-agregar {
+    width: 100%;
+    border: none;
+    background-color: #3483fa;
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.btn-agregar:hover {
+    background-color: #2968c8;
+}
+
+.btn-comprar-ahora {
+    width: 100%;
+    border: none;
+    background-color: #00a650;
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.btn-comprar-ahora:hover {
+    background-color: #008f4f;
+}
+
+/* Botón cuando el producto está agotado */
+.btn-agotado {
+    background-color: #cccccc !important;
+    color: #666666 !important;
+    cursor: not-allowed !important;
+}
+
+/* Botón principal genérico */
+.btn-principal {
+    text-decoration: none;
+    display: inline-block;
+    background-color: #00a650;
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    text-align: center;
+}
+
+.btn-principal:hover {
+    background-color: #008f4f;
+}
+
+.btn-secundario {
+    background-color: #e0e0e0;
+    color: #333;
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-secundario:hover {
+    background-color: #ccc;
+}
+
+.deshabilitado {
+    opacity: 0.6;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+/* CLASE GENERAL PARA OCULTAR */
+.oculto {
+    display: none !important;
+}
+
+/* CARRITO (PANEL LATERAL) */
+.carrito-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0,0,0,0.4);
+    z-index: 90;
+}
+
+.carrito-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 100%;
+    max-width: 420px;
+    height: 100%;
+    background-color: #fff;
+    box-shadow: -2px 0 8px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+}
+
+.carrito-header {
+    padding: 15px 15px 10px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.carrito-header h2 {
+    font-size: 18px;
+}
+
+.btn-cerrar-carrito {
+    border: none;
+    background: none;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.carrito-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.carrito-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+}
+
+.carrito-item-info h4 {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.carrito-precio-unitario {
+    font-size: 13px;
+    color: #555;
+}
+
+.carrito-item-controles {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.btn-cantidad {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: #f5f5f5;
+    cursor: pointer;
+}
+
+.btn-eliminar {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 16px;
+    margin-left: auto;
+}
+
+.carrito-cantidad {
+    min-width: 20px;
+    text-align: center;
+}
+
+.carrito-subtotal {
+    font-weight: 600;
+}
+
+.carrito-footer {
+    border-top: 1px solid #eee;
+    padding: 10px 15px 15px;
+}
+
+.carrito-total-text {
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.carrito-envio {
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+
+.carrito-envio label {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.carrito-envio select {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+.carrito-acciones {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.carrito-acciones .btn-principal,
+.carrito-acciones .btn-secundario {
+    flex: 1;
+}
+
+.carrito-ayuda {
+    font-size: 11px;
+    color: #777;
+}
+
+/* DETALLE DE PRODUCTO (MODAL) */
+.detalle-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0,0,0,0.4);
+    z-index: 80;
+}
+
+.detalle-panel {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 81;
+    padding: 15px;
+}
+
+.detalle-panel-contenido {
+    background-color: #fff;
+    max-width: 900px;
+    width: 100%;
+    max-height: 95vh;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+}
+
+.detalle-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.detalle-header h2 {
+    font-size: 18px;
+}
+
+.btn-cerrar-detalle {
+    border: none;
+    background: none;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.detalle-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr);
+    gap: 16px;
+    padding: 16px;
+    overflow-y: auto;
+}
+
+.detalle-imagen-contenedor {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px; 
+}
+
+.detalle-imagen-contenedor img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    max-height: 350px;
+    object-fit: contain;
+}
+
+.detalle-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.detalle-precio {
+    font-size: 22px;
+    font-weight: 700;
+    color: #00a650;
+}
+
+.detalle-stock {
+    font-size: 13px;
+    color: #777;
+}
+
+.detalle-descripcion {
+    margin-top: 4px;
+}
+
+.detalle-lista {
+    padding-left: 18px;
+}
+
+.detalle-lista li {
+    margin-bottom: 2px;
+}
+
+.detalle-envios-titulo {
+    margin-top: 6px;
+    font-weight: 600;
+}
+
+.detalle-envios {
+    padding-left: 18px;
+    font-size: 13px;
+}
+
+.detalle-envios li {
+    margin-bottom: 2px;
+}
+
+.detalle-botones {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+}
+
+/* FOOTER */
+.footer {
+    text-align: center;
+    font-size: 13px;
+    color: #777;
+    padding: 15px 10px;
+    margin-top: 20px;
+    border-top: 1px solid #ddd;
+    background-color: #fff;
+}
+
+
+/* Controles Carrusel */
+.detalle-imagen-controles {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+}
+
+.detalle-nav {
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    background-color: #ffffff;
+    padding: 8px 14px;
+    font-size: 20px;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.detalle-nav:hover {
+    filter: brightness(0.95);
+}
+
+.detalle-indicador {
+    font-size: 13px;
+    color: #555;
+}
+
+
+/* RESPONSIVE */
+@media (max-width: 800px) {
+    .detalle-body {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* === MODIFICACIÓN PARA MÓVILES (500PX O MENOS) === */
+/* === MODIFICACIÓN PARA MÓVILES (500PX O MENOS) === */
+@media (max-width: 600px) { 
+    
+    /* 1. HEADER: Logo y Carrito horizontal (como lo dejaste en el último paso) */
+    .header {
+        flex-direction: row; 
+        align-items: flex-start; 
+        padding: 10px 15px;
+        justify-content: space-between; 
+    }
+
+    .logo {
+        text-align: left;
+        margin-bottom: 0;
+        flex-grow: 1; 
+    }
+    
+    .logo h1 {
+        font-size: 20px; 
+    }
+    
+    .logo p {
+        font-size: 12px;
+    }
+
+    .header-right {
+        width: auto; 
+        align-items: center;
+    }
+    
+    .header .filtros-wrapper {
+        display: none !important; 
+    }
+
+
+    /* 2. BARRA DE BUSCADOR + FILTROS: MANTENEMOS EN FILA Y AJUSTAMOS TAMAÑOS */
+    .filtros {
+        padding: 10px 15px;
+        flex-direction: row; /* <--- CLAVE: Mantiene la fila */
+        gap: 8px; /* Reducimos el espacio entre el buscador y el botón */
+        align-items: center; /* Alinea verticalmente */
+        /* Eliminamos align-items: stretch para que no se estiren */
+    }
+    
+    /* El buscador ocupa la mayor parte del espacio */
+    .filtros-buscador {
+        max-width: 100%;
+        flex-grow: 1; 
+    }
+    
+    .filtros-buscador input {
+        padding: 6px 8px; /* Reducimos el padding del input */
+        font-size: 13px;
+    }
+    
+    /* El botón de filtros tiene un tamaño fijo y reducido */
+    .filtros-wrapper {
+        width: auto; 
+        flex-shrink: 0; /* Evita que el botón se achique */
+    }
+    
+    .btn-filtros {
+        padding: 6px 10px; /* Ajustamos el padding del botón */
+        font-size: 13px;
+    }
+    
+    /* Ajuste de posición del dropdown de filtros (para evitar que se vaya a la izquierda) */
+    .filtros-contenido {
+        right: 0;
+        left: auto; /* Se alinea a la derecha del botón, no al 100% de ancho */
+        width: 200px; /* Ancho fijo para móvil */
+        min-width: unset;
+        max-width: unset;
+    }
+
+
+    /* 3. Ajustes de la lista de productos (para que sean 2 columnas) */
+    .lista-productos {
+        grid-template-columns: 1fr 1fr; 
+        gap: 10px;
+    }
+    
+    .contenedor {
+        padding: 10px; 
+    }
+    
+    .tarjeta-producto {
+        padding: 8px; 
+    }
+    
+    .tarjeta-producto img {
+        height: 120px; 
+    }
+
+    .acciones-producto {
+        flex-direction: column; 
+        gap: 4px;
+    }
+    .acciones-producto button {
+        padding: 6px 8px;
+        font-size: 13px;
+    }
+}
+/* ============================================================= */
+/* ============================================================= */
+
+@media (max-width: 600px) {
+    .filtros-buscador {
+        max-width: 100%;
+    }
+}
