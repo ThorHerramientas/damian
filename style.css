@@ -8,16 +8,24 @@
 body {
     background-color: #f5f5f5;
     color: #333;
+    min-height: 100vh;
+    display: flex; 
+    flex-direction: column; 
 }
+
+main {
+    flex-grow: 1; 
+}
+
 
 /* HEADER */
 .header {
-    background-color: #ffd600; /* amarillo tipo Mercado Libre */
+    background-color: #ffd600; 
     padding: 15px 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    align-items: center; 
+    justify-content: space-between; 
 }
 
 .logo h1 {
@@ -35,9 +43,33 @@ body {
     gap: 10px;
 }
 
+/* --- BOTÓN QUIÉNES SOMOS (ESTILO PASTIILA) --- */
+.btn-quienes-somos {
+    text-decoration: none;
+    color: #333; 
+    font-weight: 700; 
+    padding: 8px 20px; 
+    border-radius: 20px; 
+    background-color: #fff; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15); 
+    transition: all 0.2s ease; 
+    font-size: 15px; 
+    white-space: nowrap; 
+    
+    margin: 0 auto; 
+    flex-shrink: 0; 
+}
+
+.btn-quienes-somos:hover {
+    background-color: #f0f0f0; 
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2); 
+    transform: translateY(-1px); 
+}
+/* ----------------------------------------------- */
+
 /* Contenedor del botón de filtros + menú */
 .filtros-wrapper {
-    position: relative; /* Importante para que el dropdown se posicione */
+    position: relative; 
 }
 
 /* BOTÓN CARRITO */
@@ -81,7 +113,6 @@ body {
     padding: 12px 20px;
     background-color: #fff;
     border-bottom: 1px solid #ddd;
-    /* Usamos Flexbox para alinear buscador y filtros */
     display: flex;
     justify-content: center; 
     gap: 15px; 
@@ -563,14 +594,8 @@ body {
 }
 
 /* FOOTER */
-.footer {
-    text-align: center;
-    font-size: 13px;
-    color: #777;
-    padding: 15px 10px;
-    margin-top: 20px;
-    border-top: 1px solid #ddd;
-    background-color: #fff;
+footer {
+    margin-top: auto;
 }
 
 
@@ -602,6 +627,147 @@ body {
 }
 
 
+/* Ocultar el botón de filtros en el header (se usa solo el de la barra de búsqueda) */
+.header .filtros-wrapper {
+    display: none;
+}
+
+
+/* --- SECCIÓN QUIÉNES SOMOS / CONTACTO (Para quienes-somos.html) --- */
+.contenedor-quienes-somos {
+    padding: 20px;
+    flex-grow: 1; 
+    display: flex; 
+    flex-direction: column;
+}
+
+.quienes-somos {
+    display: grid; /* Mantenemos el grid para las columnas en desktop */
+    grid-template-columns: 1.5fr 1fr; 
+    gap: 40px; 
+    max-width: 1200px; 
+    margin: 0 auto; 
+    padding: 30px; 
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
+    flex-grow: 1; /* Permite que el contenedor del contenido crezca */
+    min-height: 100%; 
+}
+
+/* Hacemos que la información de contacto crezca */
+.info-contacto {
+    display: flex; 
+    flex-direction: column; 
+    flex-grow: 1; 
+    justify-content: space-between; 
+}
+
+/* Hacemos que el mapa crezca */
+.mapa-ubicacion {
+    display: flex; 
+    flex-direction: column; 
+    flex-grow: 1; 
+    justify-content: space-between; 
+}
+
+/* Hacemos que el iframe del mapa tome la altura disponible */
+.mapa-ubicacion iframe {
+    width: 100%;
+    flex-grow: 1; /* El iframe ocupa el espacio restante */
+    height: auto; /* Desactivamos la altura fija para que flex-grow funcione */
+    min-height: 200px; /* Altura mínima para que no desaparezca */
+    display: block;
+    border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    margin-bottom: 10px; 
+}
+
+.quienes-somos h2 {
+    font-size: 24px;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.quienes-somos h3 {
+    font-size: 16px;
+    color: #555;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.descripcion-somos {
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.redes-contacto {
+    margin-top: 15px;
+    border-top: 1px solid #eee;
+    padding-top: 15px;
+}
+
+.redes-contacto p {
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+
+/* Estilos de botones de redes */
+.btn-red-whatsapp, .btn-red-facebook, .btn-red-instagram, .btn-red-tiktok {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 15px;
+    margin-bottom: 10px;
+    border-radius: 25px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: opacity 0.2s;
+}
+
+.btn-red-whatsapp {
+    background-color: #25d366;
+    color: white;
+}
+.btn-red-whatsapp:hover { opacity: 0.9; }
+
+.btn-red-facebook {
+    background-color: #1877f2;
+    color: white;
+}
+.btn-red-facebook:hover { opacity: 0.9; }
+
+/* INSTAGRAM */
+.btn-red-instagram {
+    background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+    color: white;
+}
+.btn-red-instagram:hover { opacity: 0.9; }
+
+/* TIKTOK */
+.btn-red-tiktok {
+    background-color: #000000; 
+    color: white;
+}
+.btn-red-tiktok:hover { opacity: 0.9; }
+
+
+.btn-red-whatsapp img, .btn-red-facebook img, .btn-red-instagram img, .btn-red-tiktok img {
+    width: 20px;
+    height: 20px;
+    background-color: white;
+    border-radius: 50%;
+}
+
+.nota-mapa {
+    font-size: 12px;
+    color: #777;
+    margin-top: 5px;
+}
+
+
 /* RESPONSIVE */
 @media (max-width: 800px) {
     .detalle-body {
@@ -609,14 +775,33 @@ body {
     }
 }
 
-/* === MODIFICACIÓN PARA MÓVILES (500PX O MENOS) === */
-/* === MODIFICACIÓN PARA MÓVILES (500PX O MENOS) === */
+/* AJUSTE RESPONSIVE para Quiénes Somos */
+@media (max-width: 768px) {
+    .quienes-somos {
+        grid-template-columns: 1fr; 
+        gap: 20px;
+        display: flex; 
+        flex-direction: column; 
+    }
+    
+    .contenedor-quienes-somos {
+        padding: 10px;
+    }
+
+    /* En móvil, el mapa también debe estirarse */
+    .mapa-ubicacion iframe {
+        min-height: 200px; 
+    }
+}
+
+
+/* === MODIFICACIÓN PARA MÓVILES (600PX O MENOS) === */
 @media (max-width: 600px) { 
     
-    /* 1. HEADER: Logo y Carrito horizontal (como lo dejaste en el último paso) */
+    /* 1. HEADER: Ajuste de posición del botón QUIÉNES SOMOS */
     .header {
         flex-direction: row; 
-        align-items: flex-start; 
+        align-items: center; 
         padding: 10px 15px;
         justify-content: space-between; 
     }
@@ -625,6 +810,7 @@ body {
         text-align: left;
         margin-bottom: 0;
         flex-grow: 1; 
+        min-width: unset;
     }
     
     .logo h1 {
@@ -634,53 +820,47 @@ body {
     .logo p {
         font-size: 12px;
     }
-
-    .header-right {
-        width: auto; 
-        align-items: center;
-    }
     
-    .header .filtros-wrapper {
-        display: none !important; 
+    .btn-quienes-somos {
+        padding: 6px 15px; 
+        font-size: 13px;
+        margin: 0 8px; 
+        flex-shrink: 0; 
     }
-
 
     /* 2. BARRA DE BUSCADOR + FILTROS: MANTENEMOS EN FILA Y AJUSTAMOS TAMAÑOS */
     .filtros {
         padding: 10px 15px;
-        flex-direction: row; /* <--- CLAVE: Mantiene la fila */
-        gap: 8px; /* Reducimos el espacio entre el buscador y el botón */
-        align-items: center; /* Alinea verticalmente */
-        /* Eliminamos align-items: stretch para que no se estiren */
+        flex-direction: row; 
+        gap: 8px; 
+        align-items: center; 
     }
     
-    /* El buscador ocupa la mayor parte del espacio */
     .filtros-buscador {
         max-width: 100%;
         flex-grow: 1; 
     }
     
     .filtros-buscador input {
-        padding: 6px 8px; /* Reducimos el padding del input */
+        padding: 6px 8px; 
         font-size: 13px;
     }
     
-    /* El botón de filtros tiene un tamaño fijo y reducido */
-    .filtros-wrapper {
+    .filtros .filtros-wrapper {
         width: auto; 
-        flex-shrink: 0; /* Evita que el botón se achique */
+        flex-shrink: 0; 
     }
     
     .btn-filtros {
-        padding: 6px 10px; /* Ajustamos el padding del botón */
+        padding: 6px 10px; 
         font-size: 13px;
     }
     
-    /* Ajuste de posición del dropdown de filtros (para evitar que se vaya a la izquierda) */
+    /* El menú desplegable de filtros se alinea a la derecha del botón */
     .filtros-contenido {
         right: 0;
-        left: auto; /* Se alinea a la derecha del botón, no al 100% de ancho */
-        width: 200px; /* Ancho fijo para móvil */
+        left: auto; 
+        width: 200px; 
         min-width: unset;
         max-width: unset;
     }
@@ -714,10 +894,3 @@ body {
     }
 }
 /* ============================================================= */
-/* ============================================================= */
-
-@media (max-width: 600px) {
-    .filtros-buscador {
-        max-width: 100%;
-    }
-}
