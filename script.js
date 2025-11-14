@@ -224,8 +224,8 @@ function generarLinkWhatsAppCarrito() {
     
     // --- VALIDACIÓN DE ENVÍO ELIMINADA ---
     // if (envio === "") {
-    //     alert("Seleccioná una opción de envío en el carrito antes de iniciar la compra.");
-    //     return null;
+    //     alert("Seleccioná una opción de envío en el carrito antes de iniciar la compra.");
+    //     return null;
     // }
     // ------------------------------------
 
@@ -299,7 +299,9 @@ function renderProductos(lista) {
 
     lista.forEach(producto => {
         const agotado = producto.stock <= 0;
-        const textoInalambrico = producto.inalambrico ? "Inalámbrico" : "Con cable";
+        // INICIO DEL CAMBIO: Usar la propiedad 'alimentacion'
+        const textoAlimentacion = producto.alimentacion || "Tipo Desconocido"; 
+        // FIN DEL CAMBIO
         const imagenes = obtenerImagenesProducto(producto);
         const imagenPrincipal = imagenes[0];
 
@@ -330,7 +332,7 @@ function renderProductos(lista) {
             <p class="descripcion">${producto.descripcion || ""}</p>
             <p class="precio">${formatearPrecio(producto.precio)}</p>
             <p class="stock">${agotado ? "Producto agotado" : `Stock: ${producto.stock} unidades`}</p>
-            <p class="stock">Marca: ${producto.marca || "-"} · ${textoInalambrico}</p>
+            <p class="stock">Marca: ${producto.marca || "-"} · ${textoAlimentacion}</p>
             <p class="envios">
                 Opciones de envío:<br>
                 ${(producto.opcionesEnvio || []).map(op => `<span>${op}</span>`).join("")}
@@ -344,12 +346,16 @@ function renderProductos(lista) {
 function aplicarFiltros() {
     const textoInput = document.getElementById("buscador");
     const marcaSelect = document.getElementById("filtro-marca");
-    const inalamSelect = document.getElementById("filtro-inalambrico");
+    // INICIO DEL CAMBIO: Usar el ID correcto del filtro de alimentación
+    const alimentacionSelect = document.getElementById("filtro-alimentacion"); 
+    // FIN DEL CAMBIO
     const ordenSelect = document.getElementById("orden-precio");
 
     const texto = textoInput ? textoInput.value.toLowerCase() : "";
     const marca = marcaSelect ? marcaSelect.value : "todas";
-    const filtroInalambrico = inalamSelect ? inalamSelect.value : "todos";
+    // INICIO DEL CAMBIO: Usar el valor del filtro de alimentación
+    const filtroAlimentacion = alimentacionSelect ? alimentacionSelect.value : "todos"; 
+    // FIN DEL CAMBIO
     const orden = ordenSelect ? ordenSelect.value : "default";
 
     let filtrados = productos.filter(p => {
@@ -359,13 +365,14 @@ function aplicarFiltros() {
 
         const coincideMarca = marca === "todas" ? true : p.marca === marca;
 
-        const coincideInalambrico =
-            filtroInalambrico === "todos"
+        // INICIO DEL CAMBIO: Nueva lógica de filtrado por la propiedad 'alimentacion'
+        const coincideAlimentacion =
+            filtroAlimentacion === "todos"
                 ? true
-                : (filtroInalambrico === "si" && p.inalambrico) ||
-                  (filtroInalambrico === "no" && !p.inalambrico);
+                : (p.alimentacion === filtroAlimentacion); 
+        // FIN DEL CAMBIO
 
-        return coincideTexto && coincideMarca && coincideInalambrico;
+        return coincideTexto && coincideMarca && coincideAlimentacion;
     });
 
     if (orden === "precio-asc") {
@@ -388,7 +395,9 @@ function abrirDetalleProducto(idProducto) {
     if (!panel || !backdrop) return;
 
     const agotado = producto.stock <= 0;
-    const textoInalambrico = producto.inalambrico ? "Inalámbrico" : "Con cable";
+    // INICIO DEL CAMBIO: Usar la propiedad 'alimentacion'
+    const textoAlimentacion = producto.alimentacion || "Tipo Desconocido"; 
+    // FIN DEL CAMBIO
     const imagenes = obtenerImagenesProducto(producto);
 
     let botonesHTML;
@@ -421,9 +430,9 @@ function abrirDetalleProducto(idProducto) {
                         hayCarrusel
                           ? `
                     <div class="detalle-imagen-controles">
-                        <button id="detalle-prev" class="detalle-nav">&lt;</button>
+                        <button id="detalle-prev" class="detalle-nav"><</button>
                         <span id="detalle-indicador" class="detalle-indicador">1 / ${imagenes.length}</span>
-                        <button id="detalle-next" class="detalle-nav">&gt;</button>
+                        <button id="detalle-next" class="detalle-nav">></button>
                     </div>`
                           : ""
                     }
@@ -432,7 +441,7 @@ function abrirDetalleProducto(idProducto) {
                     <p class="detalle-precio">${formatearPrecio(producto.precio)}</p>
                     <p class="detalle-stock">${agotado ? "Producto agotado" : `Stock disponible: ${producto.stock} unidades`}</p>
                     <p class="detalle-descripcion">${producto.descripcion || ""}</p>
-                    <p><strong>Marca:</strong> ${producto.marca || "-"} · ${textoInalambrico}</p>
+                    <p><strong>Marca:</strong> ${producto.marca || "-"} · Alimentación: ${textoAlimentacion}</p>
                     ${
                         (producto.detalles && producto.detalles.length > 0)
                           ? `<ul class="detalle-lista">
@@ -601,12 +610,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Filtros
     const buscador = document.getElementById("buscador");
     const filtroMarca = document.getElementById("filtro-marca");
-    const filtroInalambrico = document.getElementById("filtro-inalambrico");
+    // INICIO DEL CAMBIO: Usar el ID correcto del filtro de alimentación
+    const filtroAlimentacion = document.getElementById("filtro-alimentacion"); 
+    // FIN DEL CAMBIO
     const ordenPrecio = document.getElementById("orden-precio");
 
     if (buscador) buscador.addEventListener("input", aplicarFiltros);
     if (filtroMarca) filtroMarca.addEventListener("change", aplicarFiltros);
-    if (filtroInalambrico) filtroInalambrico.addEventListener("change", aplicarFiltros);
+    // INICIO DEL CAMBIO: Asignar listener al filtro de alimentación
+    if (filtroAlimentacion) filtroAlimentacion.addEventListener("change", aplicarFiltros); 
+    // FIN DEL CAMBIO
     if (ordenPrecio) ordenPrecio.addEventListener("change", aplicarFiltros);
 
     // Menú de filtros desplegable

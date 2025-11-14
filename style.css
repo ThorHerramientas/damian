@@ -894,3 +894,46 @@ footer {
     }
 }
 /* ============================================================= */
+
+
+
+
+
+
+/* === MODIFICACIÓN PARA MÓVILES (600PX O MENOS) === */
+@media (max-width: 600px) { 
+    
+    /* 1. HEADER: Apilamos el logo y los elementos de la derecha, y dejamos espacio */
+    .header {
+        /* ... (resto sin cambios) ... */
+        padding: 10px 15px; /* Reducimos el padding */
+        flex-wrap: wrap; /* Permitimos que los elementos se envuelvan a la línea de abajo */
+    }
+    
+    /* 2. LOGO: Ocupa su espacio y empuja el carrito a la derecha */
+    .logo {
+        flex-grow: 1; /* Permite que empuje al botón Quiénes Somos */
+        margin-right: 10px; /* Separación del carrito */
+    }
+    
+    /* 3. BOTÓN QUIÉNES SOMOS: Lo forzamos a la siguiente línea y lo alineamos a la izquierda */
+    .btn-quienes-somos {
+        /* Revertimos el centrado automático del header */
+        margin: 5px 0 0 0; /* Margen superior para separarlo de la línea de arriba */
+        width: 100%; /* Ocupa todo el ancho disponible */
+        order: 10; /* Lo empujamos al final del flex-flow */
+        
+        /* Mantenemos el estilo pastilla pero reducimos el tamaño en móvil */
+        padding: 6px 15px; 
+        font-size: 13px;
+        text-align: center; 
+    }
+    
+    /* 4. HEADER RIGHT (CARRITO): Permite que el carrito se mantenga a la derecha, en la línea superior */
+    .header-right {
+        order: 5; /* Aseguramos que se mantenga a la derecha del logo */
+        flex-shrink: 0;
+    }
+
+    /* ... (resto de estilos de móvil sin cambios) ... */
+}

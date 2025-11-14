@@ -1,8 +1,8 @@
 // Colección de Firestore
 const productosRef = db.collection("productos");
 
-let productos = [];      // [{id, data}]
-let filtroTexto = "";    // texto del buscador
+let productos = []; 		// [{id, data}]
+let filtroTexto = ""; 	  // texto del buscador
 
 function formatearPrecio(numero) {
   return (Number(numero) || 0).toLocaleString("es-AR", {
@@ -19,7 +19,9 @@ function limpiarFormulario() {
   document.getElementById("prod-precio").value = "";
   document.getElementById("prod-stock").value = "";
   document.getElementById("prod-categoria").value = "";
-  document.getElementById("prod-inalambrico").value = "false";
+  // INICIO DEL CAMBIO
+  document.getElementById("prod-alimentacion").value = "Otro"; // Valor por defecto
+  // FIN DEL CAMBIO
   document.getElementById("prod-imagen").value = "";
   document.getElementById("prod-descripcion").value = "";
   document.getElementById("prod-envios").value = "";
@@ -40,7 +42,9 @@ function cargarProductoEnFormulario(id, prod) {
   document.getElementById("prod-precio").value = prod.precio || 0;
   document.getElementById("prod-stock").value = prod.stock || 0;
   document.getElementById("prod-categoria").value = prod.categoria || "";
-  document.getElementById("prod-inalambrico").value = prod.inalambrico ? "true" : "false";
+  // INICIO DEL CAMBIO
+  document.getElementById("prod-alimentacion").value = prod.alimentacion || "Otro";
+  // FIN DEL CAMBIO
   document.getElementById("prod-descripcion").value = prod.descripcion || "";
   document.getElementById("prod-envios").value = (prod.opcionesEnvio || []).join(", ");
   document.getElementById("prod-detalles").value = (prod.detalles || []).join("\n");
@@ -123,7 +127,7 @@ function renderTablaProductos() {
       <td>${p.data.marca || "-"}</td>
       <td>${formatearPrecio(p.data.precio || 0)}</td>
       <td>${p.data.stock ?? "-"}</td>
-      <td>${p.data.inalambrico ? "Sí" : "No"}</td>
+      <td>${p.data.alimentacion || "-"}</td>
       <td>
         <div class="admin-table-actions">
           <button class="btn-principal btn-pequeño" data-accion="editar" data-id="${p.id}">Editar</button>
@@ -141,8 +145,8 @@ async function cargarProductosDesdeFirestore() {
     id: doc.id,
     data: doc.data()
   }));
-  renderEstadisticas();    // <-- actualiza estadísticas
-  renderTablaProductos();  // <-- lista
+  renderEstadisticas(); 	// <-- actualiza estadísticas
+  renderTablaProductos(); 	// <-- lista
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -175,7 +179,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const precio = Number(document.getElementById("prod-precio").value || 0);
     const stock = Number(document.getElementById("prod-stock").value || 0);
     const categoria = document.getElementById("prod-categoria").value.trim();
-    const inalambrico = document.getElementById("prod-inalambrico").value === "true";
+    // INICIO DEL CAMBIO
+    const alimentacion = document.getElementById("prod-alimentacion").value;
+    // FIN DEL CAMBIO
     const imagenTexto = document.getElementById("prod-imagen").value.trim();
     const descripcion = document.getElementById("prod-descripcion").value.trim();
     const enviosText = document.getElementById("prod-envios").value;
@@ -201,7 +207,9 @@ document.addEventListener("DOMContentLoaded", () => {
       precio,
       stock,
       categoria,
-      inalambrico,
+      // INICIO DEL CAMBIO
+      alimentacion, // Guardamos el string
+      // FIN DEL CAMBIO
       imagen: imagenPrincipal,
       imagenes,
       descripcion,

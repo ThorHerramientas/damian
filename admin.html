@@ -239,7 +239,6 @@
   </div>
 </header>
 
-<!-- LOGIN -->
 <div id="login-overlay" class="login-overlay">
   <div class="login-card">
     <div class="login-icon">🔒</div>
@@ -256,7 +255,6 @@
   </div>
 </div>
 
-<!-- PANEL -->
 <main id="admin-main" class="admin-container oculto">
   <h1>Productos</h1>
   <p style="font-size:13px;margin-bottom:10px;">
@@ -292,14 +290,14 @@
     </div>
 
     <div>
-      <label for="prod-inalambrico">Inalámbrico</label>
-      <select id="prod-inalambrico">
-        <option value="false">Con cable</option>
-        <option value="true">Inalámbrico</option>
-      </select>
+        <label for="prod-alimentacion">Alimentación</label>
+        <select id="prod-alimentacion">
+            <option value="Eléctrico">Eléctrico</option>
+            <option value="Inalámbrico">Inalámbrico</option>
+            <option value="Manual">Manual</option>
+            <option value="Otro">Otro/Desconocido</option>
+        </select>
     </div>
-
-    <!-- Imagen: subida + URL -->
     <div class="admin-form-full">
       <label>Imagen del producto</label>
       <input type="file" id="prod-imagen-archivo" accept="image/*">
@@ -324,7 +322,9 @@
 
     <div class="admin-form-full">
       <label for="prod-detalles">Detalles (una característica por línea)</label>
-      <textarea id="prod-detalles" placeholder="Potencia: 600W&#10;Incluye maletín&#10;Garantía: 1 año"></textarea>
+      <textarea id="prod-detalles" placeholder="Potencia: 600W
+Incluye maletín
+Garantía: 1 año"></textarea>
     </div>
 
     <div class="admin-form-full admin-buttons">
@@ -333,11 +333,10 @@
     </div>
   </form>
 
-  <!-- 🔍 Buscador de productos (ADMIN) -->
   <div class="admin-buscador">
     <input type="text" id="buscador-admin" placeholder="Buscar producto por nombre o marca...">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="8"></circle>
       <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
     </svg>
@@ -346,14 +345,13 @@
 
 
 
-<!-- 📊 Estadísticas -->
 <section id="admin-stats" class="admin-stats">
   <div class="stat">
     <span class="stat-label">📦 Productos totales</span>
     <span id="stat-total" class="stat-value">—</span>
   </div>
   <div class="stat">
-    <span class="stat-label">⚙️ Activos (stock &gt; 0)</span>
+    <span class="stat-label">⚙️ Activos (stock > 0)</span>
     <span id="stat-activos" class="stat-value">—</span>
   </div>
   <div class="stat">
@@ -380,12 +378,11 @@
         <th>Marca</th>
         <th>Precio</th>
         <th>Stock</th>
-        <th>Inalámbrico</th>
+        <th>Alimentación</th>
         <th>Acciones</th>
       </tr>
       </thead>
       <tbody id="tabla-productos-body">
-      <!-- filas desde admin.js -->
       </tbody>
     </table>
   </div>
@@ -395,7 +392,6 @@
   © 2025 Thor Herramientas - Panel de administración
 </footer>
 
-<!-- Firebase compat -->
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>
