@@ -199,9 +199,6 @@
       }
     }
 
-
-
-
 /* ======= ADMIN: ESTADÍSTICAS ======= */
 .admin-stats{
   display:grid;
@@ -222,9 +219,6 @@
 @media (max-width: 520px){
   .admin-stats{ grid-template-columns: 1fr; }
 }
-
-
-
 
   </style>
 </head>
@@ -261,6 +255,9 @@
     Desde acá podés agregar, editar o eliminar productos. Los cambios se guardan en Firestore y se ven en la tienda.
   </p>
 
+  <button type="button" id="btn-descargar-stock-pdf" class="btn-secundario" style="margin-bottom: 12px;">
+    ⬇️ Descargar Reporte de Stock (PDF)
+  </button>
   <form id="form-producto" class="admin-form">
     <input type="hidden" id="prod-id">
 
@@ -342,9 +339,6 @@ Garantía: 1 año"></textarea>
     </svg>
   </div>
 
-
-
-
 <section id="admin-stats" class="admin-stats">
   <div class="stat">
     <span class="stat-label">📦 Productos totales</span>
@@ -363,10 +357,6 @@ Garantía: 1 año"></textarea>
     <span id="stat-valor" class="stat-value">—</span>
   </div>
 </section>
-
-
-
-
 
   <h2 style="font-size:18px;margin:6px 0 8px;">Listado de productos</h2>
 
@@ -396,6 +386,8 @@ Garantía: 1 año"></textarea>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyC7oF4s3Fqy7EvjjAWxNxfPdPnmECEzQ",

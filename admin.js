@@ -19,9 +19,7 @@ function limpiarFormulario() {
   document.getElementById("prod-precio").value = "";
   document.getElementById("prod-stock").value = "";
   document.getElementById("prod-categoria").value = "";
-  // INICIO DEL CAMBIO
   document.getElementById("prod-alimentacion").value = "Otro"; // Valor por defecto
-  // FIN DEL CAMBIO
   document.getElementById("prod-imagen").value = "";
   document.getElementById("prod-descripcion").value = "";
   document.getElementById("prod-envios").value = "";
@@ -42,9 +40,7 @@ function cargarProductoEnFormulario(id, prod) {
   document.getElementById("prod-precio").value = prod.precio || 0;
   document.getElementById("prod-stock").value = prod.stock || 0;
   document.getElementById("prod-categoria").value = prod.categoria || "";
-  // INICIO DEL CAMBIO
   document.getElementById("prod-alimentacion").value = prod.alimentacion || "Otro";
-  // FIN DEL CAMBIO
   document.getElementById("prod-descripcion").value = prod.descripcion || "";
   document.getElementById("prod-envios").value = (prod.opcionesEnvio || []).join(", ");
   document.getElementById("prod-detalles").value = (prod.detalles || []).join("\n");
@@ -145,21 +141,86 @@ async function cargarProductosDesdeFirestore() {
     id: doc.id,
     data: doc.data()
   }));
-  renderEstadisticas(); 	// <-- actualiza estadísticas
-  renderTablaProductos(); 	// <-- lista
+  renderEstadisticas(); 	
+  renderTablaProductos(); 	
 }
+
+// ---------------------- GENERACIÓN DE PDF ----------------------
+function generarPDFStock() {
+    // 1. Ordenamos los productos por nombre
+    const productosOrdenados = productos.slice().sort((a, b) => {
+        const nombreA = a.data.nombre || "";
+        const nombreB = b.data.nombre || "";
+        return nombreA.localeCompare(nombreB);
+    });
+
+    // 2. Encabezados de la tabla para el PDF
+    const headers = [
+        ['Nombre', 'Marca', 'Precio', 'Stock']
+    ];
+    
+    // 3. Mapeamos los datos para autoTable
+    const data = productosOrdenados.map(p => [
+        p.data.nombre || 'Sin nombre',
+        p.data.marca || '-',
+        formatearPrecio(p.data.precio || 0),
+        (p.data.stock === undefined || p.data.stock === null) ? '-' : p.data.stock.toString()
+    ]);
+
+    // 4. Inicializamos jsPDF (usando el objeto global window.jspdf)
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // 5. Título y Fecha
+    doc.setFontSize(18);
+    doc.text("Reporte de Stock - Thor Herramientas", 14, 20);
+    
+    doc.setFontSize(10);
+    doc.text(`Generado el: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 14, 26);
+    
+    // 6. Generamos la tabla
+    doc.autoTable({
+        startY: 30, // Posición inicial de la tabla
+        head: headers,
+        body: data,
+        theme: 'striped',
+        styles: { fontSize: 10, cellPadding: 2 },
+        headStyles: { fillColor: [255, 214, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
+        columnStyles: {
+            2: { halign: 'right' }, // Precio a la derecha
+            3: { halign: 'center' } // Stock al centro
+        },
+        didDrawPage: function (data) {
+            // Footer (Número de página)
+            doc.setFontSize(8)
+            let pageCount = doc.internal.getNumberOfPages()
+            doc.text('Página ' + data.pageNumber + ' de ' + pageCount, data.settings.margin.left, doc.internal.pageSize.height - 10)
+        }
+    });
+
+    // 7. Descargar el archivo
+    doc.save(`Stock_ThorHerramientas_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+// ---------------------------------------------------------------
+
 
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("form-producto");
   const btnLimpiar = document.getElementById("btn-limpiar-form");
   const tbody = document.getElementById("tabla-productos-body");
   const inputBuscador = document.getElementById("buscador-admin");
+  const btnDescargarPDF = document.getElementById("btn-descargar-stock-pdf"); // Nuevo botón
 
   // Cargar productos
   cargarProductosDesdeFirestore().catch(err => {
     console.error("Error cargando productos:", err);
     alert("Hubo un problema cargando los productos.");
   });
+  
+  // Asignar evento al botón de descarga de PDF
+  if (btnDescargarPDF) {
+      btnDescargarPDF.addEventListener("click", generarPDFStock);
+  }
 
   // Buscar en vivo
   if (inputBuscador) {
@@ -179,9 +240,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const precio = Number(document.getElementById("prod-precio").value || 0);
     const stock = Number(document.getElementById("prod-stock").value || 0);
     const categoria = document.getElementById("prod-categoria").value.trim();
-    // INICIO DEL CAMBIO
     const alimentacion = document.getElementById("prod-alimentacion").value;
-    // FIN DEL CAMBIO
     const imagenTexto = document.getElementById("prod-imagen").value.trim();
     const descripcion = document.getElementById("prod-descripcion").value.trim();
     const enviosText = document.getElementById("prod-envios").value;
@@ -207,9 +266,7 @@ document.addEventListener("DOMContentLoaded", () => {
       precio,
       stock,
       categoria,
-      // INICIO DEL CAMBIO
-      alimentacion, // Guardamos el string
-      // FIN DEL CAMBIO
+      alimentacion, 
       imagen: imagenPrincipal,
       imagenes,
       descripcion,
