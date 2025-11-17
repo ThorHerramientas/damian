@@ -5,11 +5,16 @@ let productos = []; 		// [{id, data}]
 let filtroTexto = ""; 	  // texto del buscador
 
 function formatearPrecio(numero) {
-  return (Number(numero) || 0).toLocaleString("es-AR", {
+  // 1. Redondeamos el número a un entero.
+  const numRedondeado = Math.round(Number(numero) || 0);
+  
+  // 2. Formateamos y reemplazamos TODOS los espacios por un espacio duro (\u00A0)
+  // para evitar que el precio se corte en el PDF.
+  return numRedondeado.toLocaleString("es-AR", {
     style: "currency",
     currency: "ARS",
     minimumFractionDigits: 0
-  });
+  }).replace(/\s/g, '\u00A0'); 
 }
 
 function limpiarFormulario() {
@@ -187,7 +192,7 @@ function generarPDFStock() {
         styles: { fontSize: 10, cellPadding: 2 },
         headStyles: { fillColor: [255, 214, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
         columnStyles: {
-            2: { halign: 'right' }, // Precio a la derecha
+            2: { halign: 'right', cellWidth: 30 }, // SOLUCIÓN: Precio a la derecha y forzamos ancho de celda
             3: { halign: 'center' } // Stock al centro
         },
         didDrawPage: function (data) {
