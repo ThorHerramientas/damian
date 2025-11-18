@@ -9,7 +9,7 @@ function formatearPrecio(numero) {
   const numRedondeado = Math.round(Number(numero) || 0);
   
   // 2. Formateamos y reemplazamos TODOS los espacios por un espacio duro (\u00A0)
-  // para evitar que el precio se corte en el PDF.
+  // para evitar que el precio se corte en el PDF y forzamos ancho en generarPDFStock.
   return numRedondeado.toLocaleString("es-AR", {
     style: "currency",
     currency: "ARS",
@@ -23,7 +23,7 @@ function limpiarFormulario() {
   document.getElementById("prod-marca").value = "";
   document.getElementById("prod-precio").value = "";
   document.getElementById("prod-stock").value = "";
-  document.getElementById("prod-categoria").value = "";
+  document.getElementById("prod-codbarra").value = ""; // Limpiamos Código de Barras
   document.getElementById("prod-alimentacion").value = "Otro"; // Valor por defecto
   document.getElementById("prod-imagen").value = "";
   document.getElementById("prod-descripcion").value = "";
@@ -44,7 +44,7 @@ function cargarProductoEnFormulario(id, prod) {
   document.getElementById("prod-marca").value = prod.marca || "";
   document.getElementById("prod-precio").value = prod.precio || 0;
   document.getElementById("prod-stock").value = prod.stock || 0;
-  document.getElementById("prod-categoria").value = prod.categoria || "";
+  document.getElementById("prod-codbarra").value = prod.codbarra || ""; // Cargamos Código de Barras
   document.getElementById("prod-alimentacion").value = prod.alimentacion || "Otro";
   document.getElementById("prod-descripcion").value = prod.descripcion || "";
   document.getElementById("prod-envios").value = (prod.opcionesEnvio || []).join(", ");
@@ -76,7 +76,8 @@ function productosFiltrados() {
     return (
       (d.nombre && d.nombre.toLowerCase().includes(t)) ||
       (d.marca && d.marca.toLowerCase().includes(t)) ||
-      (d.descripcion && d.descripcion.toLowerCase().includes(t))
+      (d.descripcion && d.descripcion.toLowerCase().includes(t)) ||
+      (d.codbarra && d.codbarra.toLowerCase().includes(t)) // Buscamos por Código de Barras
     );
   });
 }
@@ -127,7 +128,17 @@ function renderTablaProductos() {
       <td>${p.data.nombre || "-"}</td>
       <td>${p.data.marca || "-"}</td>
       <td>${formatearPrecio(p.data.precio || 0)}</td>
-      <td>${p.data.stock ?? "-"}</td>
+      <td style="text-align: center;">
+        <div class="stock-controls" data-id="${p.id}" style="display:flex; align-items:center; justify-content:center; gap:4px;">
+            <button class="btn-stock-quick" data-delta="-1" data-id="${p.id}" style="
+                padding: 1px 6px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer; border-radius: 4px; font-weight: bold;
+            ">-</button>
+            <span id="stock-value-${p.id}" style="min-width: 20px;">${p.data.stock ?? "-"}</span>
+            <button class="btn-stock-quick" data-delta="+1" data-id="${p.id}" style="
+                padding: 1px 5px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer; border-radius: 4px; font-weight: bold;
+            ">+</button>
+        </div>
+      </td>
       <td>${p.data.alimentacion || "-"}</td>
       <td>
         <div class="admin-table-actions">
@@ -149,6 +160,40 @@ async function cargarProductosDesdeFirestore() {
   renderEstadisticas(); 	
   renderTablaProductos(); 	
 }
+
+// ---------------------- FUNCIONALIDAD DE STOCK RÁPIDO ----------------------
+
+async function actualizarStockRapido(idProducto, delta) {
+    const prodEntry = productos.find(p => p.id === idProducto);
+    if (!prodEntry) return;
+
+    const stockActual = Number(prodEntry.data.stock) || 0;
+    const nuevoStock = stockActual + delta;
+
+    if (nuevoStock < 0) {
+        alert(`El stock no puede ser negativo para ${prodEntry.data.nombre}. Stock actual: ${stockActual}`);
+        return;
+    }
+
+    try {
+        // 1. Actualizar en Firestore
+        await productosRef.doc(idProducto).update({ stock: nuevoStock });
+        
+        // 2. Actualizar la variable local 'productos'
+        prodEntry.data.stock = nuevoStock; 
+        
+        // 3. Actualizar la UI localmente (tabla y estadísticas)
+        const stockSpan = document.getElementById(`stock-value-${idProducto}`);
+        if (stockSpan) stockSpan.textContent = nuevoStock;
+        renderEstadisticas();
+        
+    } catch (err) {
+        console.error("Error actualizando stock:", err);
+        alert("Hubo un error al actualizar el stock.");
+    }
+}
+// ---------------------------------------------------------------------------
+
 
 // ---------------------- GENERACIÓN DE PDF ----------------------
 function generarPDFStock() {
@@ -214,7 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnLimpiar = document.getElementById("btn-limpiar-form");
   const tbody = document.getElementById("tabla-productos-body");
   const inputBuscador = document.getElementById("buscador-admin");
-  const btnDescargarPDF = document.getElementById("btn-descargar-stock-pdf"); // Nuevo botón
+  const btnDescargarPDF = document.getElementById("btn-descargar-stock-pdf"); 
 
   // Cargar productos
   cargarProductosDesdeFirestore().catch(err => {
@@ -244,8 +289,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const marca = document.getElementById("prod-marca").value.trim();
     const precio = Number(document.getElementById("prod-precio").value || 0);
     const stock = Number(document.getElementById("prod-stock").value || 0);
-    const categoria = document.getElementById("prod-categoria").value.trim();
     const alimentacion = document.getElementById("prod-alimentacion").value;
+    const codbarra = document.getElementById("prod-codbarra").value.trim(); // Campo Código de Barras
     const imagenTexto = document.getElementById("prod-imagen").value.trim();
     const descripcion = document.getElementById("prod-descripcion").value.trim();
     const enviosText = document.getElementById("prod-envios").value;
@@ -270,8 +315,8 @@ document.addEventListener("DOMContentLoaded", () => {
       marca,
       precio,
       stock,
-      categoria,
       alimentacion, 
+      codbarra, // Campo Código de Barras
       imagen: imagenPrincipal,
       imagenes,
       descripcion,
@@ -297,11 +342,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   btnLimpiar.addEventListener("click", () => limpiarFormulario());
 
-  // Editar / eliminar
+  // Escucha los clics en la tabla para EDITAR/ELIMINAR/STOCK RÁPIDO
   tbody.addEventListener("click", async (e) => {
     const accion = e.target.dataset.accion;
     const id = e.target.dataset.id;
-    if (!accion || !id) return;
+    const delta = e.target.dataset.delta; // Para los botones de stock
+    
+    if (!id) return;
+
+    if (e.target.classList.contains("btn-stock-quick")) {
+        // Lógica de STOCK RÁPIDO
+        if (delta) {
+            await actualizarStockRapido(id, Number(delta));
+        }
+        return;
+    }
 
     const prodEntry = productos.find(p => p.id === id);
     if (!prodEntry) return;

@@ -361,7 +361,8 @@ function aplicarFiltros() {
     let filtrados = productos.filter(p => {
         const coincideTexto =
             p.nombre.toLowerCase().includes(texto) ||
-            (p.descripcion || "").toLowerCase().includes(texto);
+            (p.descripcion || "").toLowerCase().includes(texto) ||
+            (p.codbarra || "").toLowerCase().includes(texto); // <-- CAMBIO: Buscamos por Código de Barras
 
         const coincideMarca = marca === "todas" ? true : p.marca === marca;
 
@@ -442,6 +443,9 @@ function abrirDetalleProducto(idProducto) {
                     <p class="detalle-stock">${agotado ? "Producto agotado" : `Stock disponible: ${producto.stock} unidades`}</p>
                     <p class="detalle-descripcion">${producto.descripcion || ""}</p>
                     <p><strong>Marca:</strong> ${producto.marca || "-"} · Alimentación: ${textoAlimentacion}</p>
+                    ${
+                        (producto.codbarra) ? `<p><strong>Código de Barras:</strong> ${producto.codbarra}</p>` : "" // <-- NUEVO: Mostramos Código de Barras
+                    }
                     ${
                         (producto.detalles && producto.detalles.length > 0)
                           ? `<ul class="detalle-lista">
