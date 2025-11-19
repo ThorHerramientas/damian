@@ -255,6 +255,9 @@
     Desde acá podés agregar, editar o eliminar productos. Los cambios se guardan en Firestore y se ven en la tienda.
   </p>
 
+  <button type="button" id="btn-realizar-venta" class="btn-principal" style="margin-right: 12px;">
+    🛒 Realizar Venta Rápida
+  </button>
   <button type="button" id="btn-descargar-stock-pdf" class="btn-secundario" style="margin-bottom: 12px;">
     ⬇️ Descargar Reporte de Stock (PDF)
   </button>
@@ -382,6 +385,34 @@ Garantía: 1 año"></textarea>
   © 2025 Thor Herramientas - Panel de administración
 </footer>
 
+
+<div id="venta-backdrop" class="login-overlay oculto" style="z-index: 9900;">
+  <div id="venta-panel" class="login-card" style="max-width: 500px; width: 95%; text-align: left; padding: 20px 25px; border-top: 4px solid var(--primario); position: relative;">
+    <button id="btn-cerrar-venta" onclick="cerrarVenta()" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 20px; cursor: pointer;">✕</button>
+    <div class="login-icon" style="border-color: var(--primario); color: var(--primario);">🛒</div>
+    <h2 style="color: var(--primario);">Realizar Venta Rápida</h2>
+    <p style="margin-bottom: 10px;">Escaneá el código de barras o ingresalo manualmente.</p>
+
+    <div style="margin-bottom: 15px;">
+        <label for="venta-input-codbarra" style="font-size: 14px;">Código de Barras</label>
+        <input type="text" id="venta-input-codbarra" placeholder="Escaneá o ingresá código..." style="padding: 8px 10px; border-radius: 6px; border: 1px solid #ccc; width: 100%; font-size: 15px; box-sizing: border-box;">
+    </div>
+
+    <h3 style="font-size: 16px; margin-bottom: 8px;">Detalle de la Venta:</h3>
+    
+    <div id="venta-items-list" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--borde); border-radius: 4px; padding: 10px; margin-bottom: 10px; background: #fafafa; font-size: 13px;">
+      </div>
+
+    <p style="font-size: 18px; font-weight: 700; border-top: 1px solid #ddd; padding-top: 10px;">
+        Total: <span id="venta-total-display" style="color: #00a650;">$ 0</span>
+    </p>
+
+    <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <button id="btn-vaciar-venta" class="btn-secundario" style="flex: 1; border-radius: 4px; padding: 10px;">Vaciar Venta</button>
+        <button id="btn-confirmar-venta" class="btn-principal" style="flex: 2; background-color: #00a650; border-radius: 4px; padding: 10px;">Confirmar Venta</button>
+    </div>
+  </div>
+</div>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>

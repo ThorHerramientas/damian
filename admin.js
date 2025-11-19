@@ -3,6 +3,7 @@ const productosRef = db.collection("productos");
 
 let productos = []; 		// [{id, data}]
 let filtroTexto = ""; 	  // texto del buscador
+let ventaActual = [];   // [{id: string, cantidad: number, precio: number, nombre: string}] 
 
 function formatearPrecio(numero) {
   // 1. Redondeamos el número a un entero.
@@ -68,19 +69,34 @@ function cargarProductoEnFormulario(id, prod) {
   }
 }
 
+// CAMBIO CRÍTICO: Normalizamos la búsqueda de productos y soportamos múltiples códigos
 function productosFiltrados() {
   if (!filtroTexto) return productos;
   const t = filtroTexto.toLowerCase();
+  
+  // Normalizamos el texto de búsqueda (quitamos no-alfanuméricos)
+  const tNormalizado = filtroTexto.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+
   return productos.filter(p => {
     const d = p.data;
-    return (
-      (d.nombre && d.nombre.toLowerCase().includes(t)) ||
-      (d.marca && d.marca.toLowerCase().includes(t)) ||
-      (d.descripcion && d.descripcion.toLowerCase().includes(t)) ||
-      (d.codbarra && d.codbarra.toLowerCase().includes(t)) // Buscamos por Código de Barras
-    );
+    
+    // Búsqueda normal (nombre, marca, descripción)
+    const textMatch = (d.nombre && d.nombre.toLowerCase().includes(t)) ||
+                      (d.marca && d.marca.toLowerCase().includes(t)) ||
+                      (d.descripcion && d.descripcion.toLowerCase().includes(t));
+
+    // Búsqueda por código de barras (soporta múltiples códigos)
+    const codigosGuardados = d.codbarra ? d.codbarra.split(',') : [];
+    
+    const codbarraMatch = codigosGuardados.some(cod => {
+        const codbarraGuardadoNormalizado = cod.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        return codbarraGuardadoNormalizado.includes(tNormalizado);
+    });
+    
+    return textMatch || codbarraMatch; // Coincide si alguna de las dos búsquedas coincide
   });
 }
+// FIN CAMBIO CRÍTICO
 
 /* ====== ESTADÍSTICAS ====== */
 function calcularEstadisticas(lista) {
@@ -195,6 +211,178 @@ async function actualizarStockRapido(idProducto, delta) {
 // ---------------------------------------------------------------------------
 
 
+// ---------------------- FUNCIONALIDAD VENTA RÁPIDA (POS) - FUNCIONES GLOBALES ----------------------
+
+function vaciarVenta() {
+    ventaActual = [];
+    renderVentaPanel();
+}
+
+function abrirVenta() {
+    const backdrop = document.getElementById('venta-backdrop');
+    if (backdrop) {
+        backdrop.style.display = 'flex'; 
+        backdrop.classList.remove('oculto');
+    }
+    vaciarVenta(); // Asegurar que inicie limpia
+    document.getElementById('venta-input-codbarra').focus();
+}
+
+function cerrarVenta() {
+    const backdrop = document.getElementById('venta-backdrop');
+    if (backdrop) {
+        backdrop.style.display = 'none'; 
+        backdrop.classList.add('oculto'); 
+    }
+    vaciarVenta();
+    // Vuelve el foco al buscador del admin al cerrar el modal (mejora de UX)
+    const buscadorAdmin = document.getElementById('buscador-admin');
+    if (buscadorAdmin) buscadorAdmin.focus();
+}
+
+// CAMBIO CRÍTICO: Normalizamos la búsqueda en el punto de venta para soportar múltiples códigos
+function agregarProductoAVenta(codbarra) {
+    if (!codbarra) return;
+
+    // Normalizamos el código de barras escaneado/ingresado
+    const codbarraNormalizado = codbarra.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+
+    // 2. Buscar en el array de productos cargados localmente
+    const productoEnStock = productos.find(p => {
+        if (!p.data.codbarra) return false;
+
+        // a. Dividir los códigos de barra guardados por coma
+        const codigosGuardados = p.data.codbarra.split(',');
+
+        // b. Verificar si alguno de los códigos guardados (normalizados) coincide con el escaneado (normalizado)
+        return codigosGuardados.some(guardado => {
+            const codbarraGuardadoNormalizado = guardado.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+            return codbarraGuardadoNormalizado === codbarraNormalizado;
+        });
+    });
+
+    if (!productoEnStock) {
+        alert(`Producto con código de barras "${codbarra}" no encontrado. Asegúrese de que el código esté correctamente cargado en el formulario de producto.`);
+        return;
+    }
+
+    const itemEnVenta = ventaActual.find(item => item.id === productoEnStock.id);
+    const stockDisponible = Number(productoEnStock.data.stock) || 0;
+    const cantidadActualVenta = itemEnVenta ? itemEnVenta.cantidad : 0;
+
+    if (stockDisponible <= cantidadActualVenta) {
+        alert(`Stock agotado o insuficiente de "${productoEnStock.data.nombre}". Stock disponible: ${stockDisponible}.`);
+        return;
+    }
+
+    if (itemEnVenta) {
+        itemEnVenta.cantidad += 1;
+    } else {
+        ventaActual.push({
+            id: productoEnStock.id,
+            nombre: productoEnStock.data.nombre,
+            precio: Number(productoEnStock.data.precio) || 0,
+            cantidad: 1
+        });
+    }
+
+    renderVentaPanel();
+}
+// FIN CAMBIO CRÍTICO
+
+function renderVentaPanel() {
+    const listaDiv = document.getElementById('venta-items-list');
+    const totalSpan = document.getElementById('venta-total-display');
+    const btnConfirmar = document.getElementById('btn-confirmar-venta');
+    let total = 0;
+
+    listaDiv.innerHTML = '';
+
+    if (ventaActual.length === 0) {
+        listaDiv.innerHTML = '<p style="color:#777;">No hay productos en la venta.</p>';
+        btnConfirmar.disabled = true;
+    } else {
+        ventaActual.forEach(item => {
+            const subtotal = item.precio * item.cantidad;
+            total += subtotal;
+            
+            const p = document.createElement('p');
+            // Reemplazamos \u00A0 con espacio normal para el display dentro del modal.
+            p.innerHTML = `
+                <span style="font-weight:600;">${item.cantidad}x</span> 
+                ${item.nombre} 
+                <span style="float:right;">${formatearPrecio(subtotal).replace(/\u00A0/g, ' ')}</span>
+            `;
+            listaDiv.appendChild(p);
+        });
+        btnConfirmar.disabled = false;
+    }
+
+    // Reemplazamos \u00A0 con espacio normal para el display del total.
+    totalSpan.textContent = formatearPrecio(total).replace(/\u00A0/g, ' ');
+}
+
+
+async function confirmarVenta() {
+    if (ventaActual.length === 0) return;
+
+    // Usamos una Transacción de Firestore para asegurar que la lectura del stock
+    // y la actualización del nuevo stock sean atómicas (seguras).
+    try {
+        const updates = await db.runTransaction(async (transaction) => {
+            const updatesList = [];
+            
+            for (const item of ventaActual) {
+                const docRef = productosRef.doc(item.id);
+                const doc = await transaction.get(docRef);
+
+                if (!doc.exists) {
+                    throw new Error(`Producto ${item.nombre} no existe en la base de datos.`);
+                }
+                
+                const data = doc.data();
+                const stockActual = Number(data.stock) || 0;
+                const cantidadVendida = item.cantidad;
+                const nuevoStock = stockActual - cantidadVendida;
+
+                if (nuevoStock < 0) {
+                    throw new Error(`Stock insuficiente para "${item.nombre}". Stock: ${stockActual}, Venta: ${cantidadVendida}.`);
+                }
+
+                // 1. Actualizar el stock en la transacción
+                transaction.update(docRef, { stock: nuevoStock });
+
+                // 2. Preparar la actualización local para la UI (después de la transacción)
+                updatesList.push({ id: item.id, nuevoStock: nuevoStock });
+            }
+
+            return updatesList; // Devolvemos las actualizaciones exitosas
+        });
+
+        // Si la transacción fue exitosa, actualizamos la UI y el estado local.
+        updates.forEach(update => {
+            const prodEntry = productos.find(p => p.id === update.id);
+            if (prodEntry) prodEntry.data.stock = update.nuevoStock;
+        });
+
+        const totalVenta = ventaActual.reduce((t, i) => t + i.precio * i.cantidad, 0);
+        alert(`Venta por ${formatearPrecio(totalVenta).replace(/\u00A0/g, ' ')} confirmada y stock actualizado!`);
+        
+        // Refrescar toda la interfaz del administrador
+        vaciarVenta();
+        renderTablaProductos();
+        renderEstadisticas();
+        // Cierra el panel y vuelve al admin principal
+        cerrarVenta(); 
+
+    } catch (error) {
+        console.error("Error en la transacción de venta:", error);
+        alert(`Error al confirmar la venta: ${error.message}`);
+    }
+}
+// ---------------------------------------------------------------------------
+
+
 // ---------------------- GENERACIÓN DE PDF ----------------------
 function generarPDFStock() {
     // 1. Ordenamos los productos por nombre
@@ -237,8 +425,8 @@ function generarPDFStock() {
         styles: { fontSize: 10, cellPadding: 2 },
         headStyles: { fillColor: [255, 214, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
         columnStyles: {
-            2: { halign: 'right', cellWidth: 30 }, // SOLUCIÓN: Precio a la derecha y forzamos ancho de celda
-            3: { halign: 'center' } // Stock al centro
+            2: { halign: 'right', cellWidth: 30 }, 
+            3: { halign: 'center' } 
         },
         didDrawPage: function (data) {
             // Footer (Número de página)
@@ -251,7 +439,6 @@ function generarPDFStock() {
     // 7. Descargar el archivo
     doc.save(`Stock_ThorHerramientas_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
-// ---------------------------------------------------------------
 
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -260,7 +447,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const tbody = document.getElementById("tabla-productos-body");
   const inputBuscador = document.getElementById("buscador-admin");
   const btnDescargarPDF = document.getElementById("btn-descargar-stock-pdf"); 
-
+  
+  // NUEVOS BOTONES DE VENTA
+  const btnRealizarVenta = document.getElementById('btn-realizar-venta');
+  const inputCodBarraVenta = document.getElementById('venta-input-codbarra');
+  const btnVaciarVenta = document.getElementById('btn-vaciar-venta');
+  const btnConfirmarVenta = document.getElementById('btn-confirmar-venta');
+  
   // Cargar productos
   cargarProductosDesdeFirestore().catch(err => {
     console.error("Error cargando productos:", err);
@@ -279,6 +472,33 @@ document.addEventListener("DOMContentLoaded", () => {
       renderTablaProductos();
     });
   }
+
+  // ------------- LISTENERS VENTA RÁPIDA -------------
+  if (btnRealizarVenta) btnRealizarVenta.addEventListener('click', abrirVenta);
+  // NOTA: btnCerrarVenta usa onclick="cerrarVenta()" en el HTML.
+  if (btnVaciarVenta) btnVaciarVenta.addEventListener('click', vaciarVenta);
+  if (btnConfirmarVenta) btnConfirmarVenta.addEventListener('click', confirmarVenta);
+
+  if (inputCodBarraVenta) {
+      inputCodBarraVenta.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+              e.preventDefault();
+              const codbarra = inputCodBarraVenta.value.trim();
+              agregarProductoAVenta(codbarra);
+              inputCodBarraVenta.value = ''; // Limpiar campo después de escanear/ingresar
+          }
+      });
+      // Permite agregar si se pierde el foco (útil para escáneres que no envían Enter)
+      inputCodBarraVenta.addEventListener('blur', () => {
+          const codbarra = inputCodBarraVenta.value.trim();
+          if (codbarra) {
+              agregarProductoAVenta(codbarra);
+              inputCodBarraVenta.value = ''; 
+          }
+      });
+  }
+  // ----------------------------------------------------
+
 
   // Guardar / actualizar
   form.addEventListener("submit", async (e) => {
