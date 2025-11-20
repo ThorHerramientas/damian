@@ -69,7 +69,6 @@ function cargarProductoEnFormulario(id, prod) {
   }
 }
 
-// CAMBIO CRÍTICO: Normalizamos la búsqueda de productos y soportamos múltiples códigos
 function productosFiltrados() {
   if (!filtroTexto) return productos;
   const t = filtroTexto.toLowerCase();
@@ -96,7 +95,6 @@ function productosFiltrados() {
     return textMatch || codbarraMatch; // Coincide si alguna de las dos búsquedas coincide
   });
 }
-// FIN CAMBIO CRÍTICO
 
 /* ====== ESTADÍSTICAS ====== */
 function calcularEstadisticas(lista) {
@@ -149,7 +147,10 @@ function renderTablaProductos() {
             <button class="btn-stock-quick" data-delta="-1" data-id="${p.id}" style="
                 padding: 1px 6px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer; border-radius: 4px; font-weight: bold;
             ">-</button>
-            <span id="stock-value-${p.id}" style="min-width: 20px;">${p.data.stock ?? "-"}</span>
+            <input type="number" id="stock-input-${p.id}" value="${p.data.stock ?? 0}" min="0" data-id="${p.id}"
+                style="width: 45px; text-align: center; border: 1px solid #ccc; border-radius: 4px; padding: 1px;" 
+                class="stock-input-edit"
+            >
             <button class="btn-stock-quick" data-delta="+1" data-id="${p.id}" style="
                 padding: 1px 5px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer; border-radius: 4px; font-weight: bold;
             ">+</button>
@@ -177,8 +178,44 @@ async function cargarProductosDesdeFirestore() {
   renderTablaProductos(); 	
 }
 
-// ---------------------- FUNCIONALIDAD DE STOCK RÁPIDO ----------------------
+// ---------------------- FUNCIONALIDAD DE ACTUALIZACIÓN DE STOCK ----------------------
 
+// NUEVA FUNCIÓN: Actualiza el stock cuando el usuario presiona Enter o cambia el campo
+async function actualizarStockRapidoPorInput(idProducto, nuevoValor) {
+    const prodEntry = productos.find(p => p.id === idProducto);
+    if (!prodEntry) return;
+
+    let nuevoStock = Number(nuevoValor);
+    if (isNaN(nuevoStock) || nuevoStock < 0) {
+        alert("Valor de stock inválido. Debe ser un número positivo.");
+        // Restablecer el valor en la UI
+        const inputEl = document.getElementById(`stock-input-${idProducto}`);
+        if(inputEl) inputEl.value = prodEntry.data.stock ?? 0;
+        return;
+    }
+    
+    // Aseguramos que sea un entero (opcional, pero stock suele ser entero)
+    nuevoStock = Math.round(nuevoStock);
+
+    try {
+        // 1. Actualizar en Firestore
+        await productosRef.doc(idProducto).update({ stock: nuevoStock });
+        
+        // 2. Actualizar la variable local 'productos'
+        prodEntry.data.stock = nuevoStock; 
+        
+        // 3. Actualizar la UI (estadísticas)
+        renderEstadisticas();
+
+        console.log(`Stock de ${prodEntry.data.nombre} actualizado a ${nuevoStock} por teclado.`);
+        
+    } catch (err) {
+        console.error("Error actualizando stock por input:", err);
+        alert("Hubo un error al actualizar el stock.");
+    }
+}
+
+// FUNCION EXISTENTE: Actualiza el stock por +/- botones
 async function actualizarStockRapido(idProducto, delta) {
     const prodEntry = productos.find(p => p.id === idProducto);
     if (!prodEntry) return;
@@ -198,9 +235,9 @@ async function actualizarStockRapido(idProducto, delta) {
         // 2. Actualizar la variable local 'productos'
         prodEntry.data.stock = nuevoStock; 
         
-        // 3. Actualizar la UI localmente (tabla y estadísticas)
-        const stockSpan = document.getElementById(`stock-value-${idProducto}`);
-        if (stockSpan) stockSpan.textContent = nuevoStock;
+        // 3. Actualizar la UI localmente (input y estadísticas)
+        const inputEl = document.getElementById(`stock-input-${idProducto}`);
+        if (inputEl) inputEl.value = nuevoStock; // Actualizamos el input
         renderEstadisticas();
         
     } catch (err) {
@@ -224,7 +261,7 @@ function abrirVenta() {
         backdrop.style.display = 'flex'; 
         backdrop.classList.remove('oculto');
     }
-    vaciarVenta(); // Asegurar que inicie limpia
+    vaciarVenta(); 
     document.getElementById('venta-input-codbarra').focus();
 }
 
@@ -235,26 +272,50 @@ function cerrarVenta() {
         backdrop.classList.add('oculto'); 
     }
     vaciarVenta();
-    // Vuelve el foco al buscador del admin al cerrar el modal (mejora de UX)
     const buscadorAdmin = document.getElementById('buscador-admin');
     if (buscadorAdmin) buscadorAdmin.focus();
 }
 
-// CAMBIO CRÍTICO: Normalizamos la búsqueda en el punto de venta para soportar múltiples códigos
+function renderVentaPanel() {
+    const listaDiv = document.getElementById('venta-items-list');
+    const totalSpan = document.getElementById('venta-total-display');
+    const btnConfirmar = document.getElementById('btn-confirmar-venta');
+    let total = 0;
+
+    listaDiv.innerHTML = '';
+
+    if (ventaActual.length === 0) {
+        listaDiv.innerHTML = '<p style="color:#777;">No hay productos en la venta.</p>';
+        btnConfirmar.disabled = true;
+    } else {
+        ventaActual.forEach(item => {
+            const subtotal = item.precio * item.cantidad;
+            total += subtotal;
+            
+            const p = document.createElement('p');
+            p.innerHTML = `
+                <span style="font-weight:600;">${item.cantidad}x</span> 
+                ${item.nombre} 
+                <span style="float:right;">${formatearPrecio(subtotal).replace(/\u00A0/g, ' ')}</span>
+            `;
+            listaDiv.appendChild(p);
+        });
+        btnConfirmar.disabled = false;
+    }
+
+    totalSpan.textContent = formatearPrecio(total).replace(/\u00A0/g, ' ');
+}
+
 function agregarProductoAVenta(codbarra) {
     if (!codbarra) return;
 
-    // Normalizamos el código de barras escaneado/ingresado
     const codbarraNormalizado = codbarra.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 
-    // 2. Buscar en el array de productos cargados localmente
     const productoEnStock = productos.find(p => {
         if (!p.data.codbarra) return false;
 
-        // a. Dividir los códigos de barra guardados por coma
         const codigosGuardados = p.data.codbarra.split(',');
 
-        // b. Verificar si alguno de los códigos guardados (normalizados) coincide con el escaneado (normalizado)
         return codigosGuardados.some(guardado => {
             const codbarraGuardadoNormalizado = guardado.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
             return codbarraGuardadoNormalizado === codbarraNormalizado;
@@ -288,46 +349,11 @@ function agregarProductoAVenta(codbarra) {
 
     renderVentaPanel();
 }
-// FIN CAMBIO CRÍTICO
-
-function renderVentaPanel() {
-    const listaDiv = document.getElementById('venta-items-list');
-    const totalSpan = document.getElementById('venta-total-display');
-    const btnConfirmar = document.getElementById('btn-confirmar-venta');
-    let total = 0;
-
-    listaDiv.innerHTML = '';
-
-    if (ventaActual.length === 0) {
-        listaDiv.innerHTML = '<p style="color:#777;">No hay productos en la venta.</p>';
-        btnConfirmar.disabled = true;
-    } else {
-        ventaActual.forEach(item => {
-            const subtotal = item.precio * item.cantidad;
-            total += subtotal;
-            
-            const p = document.createElement('p');
-            // Reemplazamos \u00A0 con espacio normal para el display dentro del modal.
-            p.innerHTML = `
-                <span style="font-weight:600;">${item.cantidad}x</span> 
-                ${item.nombre} 
-                <span style="float:right;">${formatearPrecio(subtotal).replace(/\u00A0/g, ' ')}</span>
-            `;
-            listaDiv.appendChild(p);
-        });
-        btnConfirmar.disabled = false;
-    }
-
-    // Reemplazamos \u00A0 con espacio normal para el display del total.
-    totalSpan.textContent = formatearPrecio(total).replace(/\u00A0/g, ' ');
-}
 
 
 async function confirmarVenta() {
     if (ventaActual.length === 0) return;
 
-    // Usamos una Transacción de Firestore para asegurar que la lectura del stock
-    // y la actualización del nuevo stock sean atómicas (seguras).
     try {
         const updates = await db.runTransaction(async (transaction) => {
             const updatesList = [];
@@ -349,17 +375,14 @@ async function confirmarVenta() {
                     throw new Error(`Stock insuficiente para "${item.nombre}". Stock: ${stockActual}, Venta: ${cantidadVendida}.`);
                 }
 
-                // 1. Actualizar el stock en la transacción
                 transaction.update(docRef, { stock: nuevoStock });
 
-                // 2. Preparar la actualización local para la UI (después de la transacción)
                 updatesList.push({ id: item.id, nuevoStock: nuevoStock });
             }
 
-            return updatesList; // Devolvemos las actualizaciones exitosas
+            return updatesList;
         });
 
-        // Si la transacción fue exitosa, actualizamos la UI y el estado local.
         updates.forEach(update => {
             const prodEntry = productos.find(p => p.id === update.id);
             if (prodEntry) prodEntry.data.stock = update.nuevoStock;
@@ -368,11 +391,9 @@ async function confirmarVenta() {
         const totalVenta = ventaActual.reduce((t, i) => t + i.precio * i.cantidad, 0);
         alert(`Venta por ${formatearPrecio(totalVenta).replace(/\u00A0/g, ' ')} confirmada y stock actualizado!`);
         
-        // Refrescar toda la interfaz del administrador
         vaciarVenta();
         renderTablaProductos();
         renderEstadisticas();
-        // Cierra el panel y vuelve al admin principal
         cerrarVenta(); 
 
     } catch (error) {
@@ -475,7 +496,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ------------- LISTENERS VENTA RÁPIDA -------------
   if (btnRealizarVenta) btnRealizarVenta.addEventListener('click', abrirVenta);
-  // NOTA: btnCerrarVenta usa onclick="cerrarVenta()" en el HTML.
   if (btnVaciarVenta) btnVaciarVenta.addEventListener('click', vaciarVenta);
   if (btnConfirmarVenta) btnConfirmarVenta.addEventListener('click', confirmarVenta);
 
@@ -500,7 +520,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ----------------------------------------------------
 
 
-  // Guardar / actualizar
+  // Guardar / actualizar (Formulario)
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -562,7 +582,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   btnLimpiar.addEventListener("click", () => limpiarFormulario());
 
-  // Escucha los clics en la tabla para EDITAR/ELIMINAR/STOCK RÁPIDO
+  // Escucha los clics en la tabla para +/- y Editar/Eliminar
   tbody.addEventListener("click", async (e) => {
     const accion = e.target.dataset.accion;
     const id = e.target.dataset.id;
@@ -571,7 +591,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!id) return;
 
     if (e.target.classList.contains("btn-stock-quick")) {
-        // Lógica de STOCK RÁPIDO
+        // Lógica de STOCK RÁPIDO (+ / -)
         if (delta) {
             await actualizarStockRapido(id, Number(delta));
         }
@@ -595,6 +615,15 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("Error eliminando producto:", err);
         alert("No se pudo eliminar el producto.");
       }
+    }
+  });
+  
+  // NUEVO LISTENER: Escucha el cambio de valor en el input de stock
+  tbody.addEventListener("change", async (e) => {
+    if (e.target.classList.contains("stock-input-edit")) {
+      const id = e.target.dataset.id;
+      const nuevoValor = e.target.value;
+      await actualizarStockRapidoPorInput(id, nuevoValor);
     }
   });
 });
