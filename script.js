@@ -34,6 +34,18 @@ function obtenerImagenesProducto(producto) {
     return imagenes;
 }
 
+// NUEVA FUNCIÓN: Asegura que la URL de la imagen sea absoluta
+function makeAbsoluteUrl(url) {
+    if (!url || url.startsWith('http://') || url.startsWith('https://')) {
+        return url; // Ya es absoluta
+    }
+    // Si la URL es relativa, le anteponemos la URL base actual.
+    // Usamos split('?')[0] para evitar anexar el path al parámetro ?producto=...
+    const baseUrl = window.location.href.split('?')[0];
+    const path = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1);
+    return path + url;
+}
+
 // ---------------------- URL / DEEP-LINK ----------------------
 
 function buildProductURL(id) {
@@ -58,7 +70,7 @@ function clearProductFromURL() {
     history.pushState({}, "", url.toString());
 }
 
-// ---------------------- Open Graph Meta Tags (NUEVA FUNCIÓN) ----------------------
+// ---------------------- Open Graph Meta Tags (MODIFICADA) ----------------------
 
 function actualizarMetaTagsProducto(producto) {
     // Valores por defecto
@@ -74,7 +86,7 @@ function actualizarMetaTagsProducto(producto) {
         
         title = producto.nombre + ' | Thor Herramientas';
         description = producto.descripcion || `Precio: ${formatearPrecio(producto.precio)}. Stock: ${producto.stock}.`;
-        image = imagenPrincipal;
+        image = makeAbsoluteUrl(imagenPrincipal); // APLICAMOS LA FUNCIÓN DE URL ABSOLUTA AQUÍ
         url = buildProductURL(producto.id);
     } else {
         title = defaultTitle;
