@@ -58,6 +58,48 @@ function clearProductFromURL() {
     history.pushState({}, "", url.toString());
 }
 
+// ---------------------- Open Graph Meta Tags (NUEVA FUNCIÓN) ----------------------
+
+function actualizarMetaTagsProducto(producto) {
+    // Valores por defecto
+    const defaultTitle = "Thor Herramientas - Tu pasión, nuestra potencia";
+    const defaultDescription = "Encontrá herramientas profesionales de calidad para talleres y construcción.";
+    const defaultImage = "https://via.placeholder.com/600x400?text=Thor+Herramientas";
+    
+    let title, description, image, url;
+
+    if (producto) {
+        const imagenes = obtenerImagenesProducto(producto);
+        const imagenPrincipal = imagenes[0];
+        
+        title = producto.nombre + ' | Thor Herramientas';
+        description = producto.descripcion || `Precio: ${formatearPrecio(producto.precio)}. Stock: ${producto.stock}.`;
+        image = imagenPrincipal;
+        url = buildProductURL(producto.id);
+    } else {
+        title = defaultTitle;
+        description = defaultDescription;
+        image = defaultImage;
+        url = window.location.origin + window.location.pathname;
+    }
+
+    // Actualiza las meta tags
+    document.title = title;
+    
+    // Función auxiliar para actualizar meta tags por ID
+    const setMetaContent = (id, content) => {
+        const tag = document.getElementById(id);
+        if (tag) tag.setAttribute('content', content);
+    };
+
+    setMetaContent('og-title', title);
+    setMetaContent('og-description', description);
+    setMetaContent('og-image', image);
+    setMetaContent('og-url', url);
+}
+// ----------------------------------------------------------------------------------
+
+
 // ---------------------- FIRESTORE ----------------------
 
 async function cargarProductosDesdeFirestore() {
@@ -345,32 +387,46 @@ function renderProductos(lista) {
 
 function aplicarFiltros() {
     const textoInput = document.getElementById("buscador");
-    const marcaSelect = document.getElementById("filtro-marca");
+    const filtroMarca = document.getElementById("filtro-marca");
     // INICIO DEL CAMBIO: Usar el ID correcto del filtro de alimentación
-    const alimentacionSelect = document.getElementById("filtro-alimentacion"); 
+    const filtroAlimentacion = document.getElementById("filtro-alimentacion"); 
     // FIN DEL CAMBIO
-    const ordenSelect = document.getElementById("orden-precio");
+    const ordenPrecio = document.getElementById("orden-precio");
 
     const texto = textoInput ? textoInput.value.toLowerCase() : "";
-    const marca = marcaSelect ? marcaSelect.value : "todas";
+    const marca = filtroMarca ? filtroMarca.value : "todas";
+    // Normalizamos el texto de búsqueda para el código de barras
+    const tNormalizado = texto.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+
     // INICIO DEL CAMBIO: Usar el valor del filtro de alimentación
-    const filtroAlimentacion = alimentacionSelect ? alimentacionSelect.value : "todos"; 
+    const filtroAlimentacionValue = filtroAlimentacion ? filtroAlimentacion.value : "todos"; 
     // FIN DEL CAMBIO
-    const orden = ordenSelect ? ordenSelect.value : "default";
+    const orden = ordenPrecio ? ordenPrecio.value : "default";
 
     let filtrados = productos.filter(p => {
-        const coincideTexto =
-            p.nombre.toLowerCase().includes(texto) ||
-            (p.descripcion || "").toLowerCase().includes(texto) ||
-            (p.codbarra || "").toLowerCase().includes(texto); // <-- CAMBIO: Buscamos por Código de Barras
+        const d = p; // p es el objeto producto
+        
+        // Búsqueda normal (nombre, marca, descripción)
+        const textMatch = (d.nombre && d.nombre.toLowerCase().includes(texto)) ||
+                          (d.descripcion || "").toLowerCase().includes(texto);
+                          
+        // Búsqueda por código de barras (normalizado)
+        const codigosGuardados = d.codbarra ? d.codbarra.split(',') : [];
+        const codbarraMatch = codigosGuardados.some(cod => {
+            const codbarraGuardadoNormalizado = cod.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+            return codbarraGuardadoNormalizado.includes(tNormalizado);
+        });
+
+        const coincideTexto = textMatch || codbarraMatch;
+
 
         const coincideMarca = marca === "todas" ? true : p.marca === marca;
 
         // INICIO DEL CAMBIO: Nueva lógica de filtrado por la propiedad 'alimentacion'
         const coincideAlimentacion =
-            filtroAlimentacion === "todos"
+            filtroAlimentacionValue === "todos"
                 ? true
-                : (p.alimentacion === filtroAlimentacion); 
+                : (p.alimentacion === filtroAlimentacionValue); 
         // FIN DEL CAMBIO
 
         return coincideTexto && coincideMarca && coincideAlimentacion;
@@ -390,6 +446,9 @@ function aplicarFiltros() {
 function abrirDetalleProducto(idProducto) {
     const producto = obtenerProductoPorId(idProducto);
     if (!producto) return;
+    
+    // Al abrir el detalle, actualizamos las meta tags para la URL actual
+    actualizarMetaTagsProducto(producto); 
 
     const panel = document.getElementById("detalle-panel");
     const backdrop = document.getElementById("detalle-backdrop");
@@ -550,6 +609,9 @@ function cerrarDetalleProducto() {
     const backdrop = document.getElementById("detalle-backdrop");
     if (panel) panel.classList.add("oculto");
     if (backdrop) backdrop.classList.add("oculto");
+    
+    // Al cerrar el detalle, revertimos las meta tags a los valores por defecto
+    actualizarMetaTagsProducto(null); 
 }
 
 // ---------------------- IMAGEN AMPLIADA -----------------
@@ -603,13 +665,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     cargarMarcasEnFiltro();
     renderProductos(productos);
     actualizarCarritoUI();
-
+    
     // Si la URL ya trae ?producto=ID, abrimos ese detalle
     const inicialId = getProductIdFromURL();
     if (inicialId) {
         const existe = obtenerProductoPorId(inicialId);
-        if (existe) abrirDetalleProducto(inicialId);
+        if (existe) {
+            // Actualizamos meta tags antes de abrir el modal (crucial para SEO/Sharing)
+            actualizarMetaTagsProducto(existe); 
+            abrirDetalleProducto(inicialId);
+        } else {
+             // Si el ID no existe, aseguramos las meta tags por defecto
+            actualizarMetaTagsProducto(null);
+        }
+    } else {
+        // Si no hay ID en URL, aseguramos las meta tags por defecto
+        actualizarMetaTagsProducto(null);
     }
+
 
     // Filtros
     const buscador = document.getElementById("buscador");
@@ -713,9 +786,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         const pid = getProductIdFromURL();
         if (pid) {
             const p = obtenerProductoPorId(pid);
-            if (p) abrirDetalleProducto(pid);
+            if (p) {
+                actualizarMetaTagsProducto(p);
+                abrirDetalleProducto(pid);
+            }
         } else {
             cerrarDetalleProducto();
+            actualizarMetaTagsProducto(null); // Asegura que se reviertan los meta tags
         }
     });
 });
