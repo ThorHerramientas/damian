@@ -1,9 +1,14 @@
-// Colección de Firestore
+// Colecciones de Firestore
 const productosRef = db.collection("productos");
+const COLECCION_VENTAS = "ventas"; 
 
 let productos = []; 		// [{id, data}]
 let filtroTexto = ""; 	  // texto del buscador
 let ventaActual = [];   // [{id: string, cantidad: number, precio: number, nombre: string}] 
+let porcentajeDescuento = 0; // Almacena el porcentaje (0-100)
+let myChartGanancia = null; // Para guardar la instancia del gráfico
+let myChartProductos = null;
+let myChartTransacciones = null;
 
 function formatearPrecio(numero) {
   // 1. Redondeamos el número a un entero.
@@ -252,6 +257,9 @@ async function actualizarStockRapido(idProducto, delta) {
 
 function vaciarVenta() {
     ventaActual = [];
+    porcentajeDescuento = 0; // Reinicia el porcentaje de descuento
+    const inputDescuento = document.getElementById('venta-input-descuento');
+    if (inputDescuento) inputDescuento.value = ''; // Limpia el input de descuento
     renderVentaPanel();
 }
 
@@ -276,11 +284,45 @@ function cerrarVenta() {
     if (buscadorAdmin) buscadorAdmin.focus();
 }
 
+// FUNCIÓN MODIFICADA: Aplica el descuento en porcentaje
+function aplicarDescuento() {
+    const inputDescuento = document.getElementById('venta-input-descuento');
+    if (!inputDescuento) return;
+
+    let porcentaje = Number(inputDescuento.value) || 0;
+    
+    // Validaciones
+    if (porcentaje < 0 || porcentaje > 100) {
+        alert("El descuento debe ser un porcentaje entre 0 y 100.");
+        porcentaje = Math.min(100, Math.max(0, porcentaje)); // Limita entre 0 y 100
+        inputDescuento.value = porcentaje;
+    }
+
+    porcentajeDescuento = porcentaje;
+    renderVentaPanel();
+}
+
+// FUNCIÓN MODIFICADA: Quita el descuento
+function quitarDescuento() {
+    const inputDescuento = document.getElementById('venta-input-descuento');
+    if (inputDescuento) inputDescuento.value = '';
+    porcentajeDescuento = 0; // Reinicia el porcentaje
+    renderVentaPanel();
+}
+
+
 function renderVentaPanel() {
     const listaDiv = document.getElementById('venta-items-list');
-    const totalSpan = document.getElementById('venta-total-display');
+    const totalSinDtoSpan = document.getElementById('venta-total-sin-dto-display');
+    const descuentoAplicadoSpan = document.getElementById('venta-descuento-aplicado-display');
+    const totalFinalSpan = document.getElementById('venta-total-final-display');
     const btnConfirmar = document.getElementById('btn-confirmar-venta');
-    let total = 0;
+    
+    const totalSinDescuento = ventaActual.reduce((total, item) => total + (item.precio * item.cantidad), 0);
+    
+    // CÁLCULO CLAVE PARA PORCENTAJE
+    const montoDescuento = totalSinDescuento * (porcentajeDescuento / 100);
+    const totalFinal = Math.max(0, totalSinDescuento - montoDescuento); 
 
     listaDiv.innerHTML = '';
 
@@ -290,7 +332,6 @@ function renderVentaPanel() {
     } else {
         ventaActual.forEach(item => {
             const subtotal = item.precio * item.cantidad;
-            total += subtotal;
             
             const p = document.createElement('p');
             p.innerHTML = `
@@ -303,7 +344,10 @@ function renderVentaPanel() {
         btnConfirmar.disabled = false;
     }
 
-    totalSpan.textContent = formatearPrecio(total).replace(/\u00A0/g, ' ');
+    // Actualiza los displays de totales y descuento
+    totalSinDtoSpan.textContent = formatearPrecio(totalSinDescuento).replace(/\u00A0/g, ' ');
+    descuentoAplicadoSpan.textContent = formatearPrecio(montoDescuento).replace(/\u00A0/g, ' ');
+    totalFinalSpan.textContent = formatearPrecio(totalFinal).replace(/\u00A0/g, ' ');
 }
 
 function agregarProductoAVenta(codbarra) {
@@ -346,7 +390,8 @@ function agregarProductoAVenta(codbarra) {
             cantidad: 1
         });
     }
-
+    
+    // Forzamos la actualización del panel al agregar un producto
     renderVentaPanel();
 }
 
@@ -388,8 +433,31 @@ async function confirmarVenta() {
             if (prodEntry) prodEntry.data.stock = update.nuevoStock;
         });
 
-        const totalVenta = ventaActual.reduce((t, i) => t + i.precio * i.cantidad, 0);
-        alert(`Venta por ${formatearPrecio(totalVenta).replace(/\u00A0/g, ' ')} confirmada y stock actualizado!`);
+        const totalSinDto = ventaActual.reduce((t, i) => t + i.precio * i.cantidad, 0);
+        const montoDescuento = totalSinDto * (porcentajeDescuento / 100);
+        const totalFinalVenta = totalSinDto - montoDescuento;
+
+        // --- LÓGICA PARA GUARDAR LA VENTA ---
+        const ventaData = {
+            fecha: firebase.firestore.FieldValue.serverTimestamp(), // Firestore timestamp
+            fechaString: new Date().toISOString().split('T')[0], // YYYY-MM-DD for easier grouping/querying
+            totalSinDescuento: totalSinDto,
+            montoDescuento: montoDescuento,
+            porcentajeDescuento: porcentajeDescuento,
+            totalFinal: totalFinalVenta,
+            items: ventaActual.map(item => ({
+                id: item.id,
+                nombre: item.nombre,
+                precioUnitario: item.precio,
+                cantidad: item.cantidad
+            }))
+        };
+        
+        await db.collection(COLECCION_VENTAS).add(ventaData);
+        // --- FIN LÓGICA PARA GUARDAR LA VENTA ---
+
+
+        alert(`Venta por ${formatearPrecio(totalFinalVenta).replace(/\u00A0/g, ' ')} (Dto: ${porcentajeDescuento}%) confirmada y stock actualizado!`);
         
         vaciarVenta();
         renderTablaProductos();
@@ -402,6 +470,258 @@ async function confirmarVenta() {
     }
 }
 // ---------------------------------------------------------------------------
+
+
+// ---------------------- FUNCIONALIDAD HISTORIAL DE VENTAS Y GRÁFICOS ----------------------
+
+function procesarDatosParaGraficos(ventas) {
+    // Calcula las fechas para los últimos 7 días (0 = hoy, 6 = hace 6 días)
+    const fechas = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() - i);
+        fechas.push(d.toISOString().split('T')[0]);
+    }
+    
+    const datosDiarios = {}; // Agrupados por fechaString (YYYY-MM-DD)
+    const datosProductos = {}; // { nombreProducto: cantidadTotalVendida }
+
+    // Inicializar datos para los 7 días
+    fechas.forEach(fecha => {
+        datosDiarios[fecha] = { ganancia: 0, transacciones: 0, ventas: [] };
+    });
+
+    ventas.forEach(venta => {
+        const fecha = venta.fechaString;
+        
+        // 1. Datos Diarios (Ganancia y Transacciones)
+        if (datosDiarios[fecha]) {
+            datosDiarios[fecha].ganancia += venta.totalFinal || 0;
+            datosDiarios[fecha].transacciones += 1;
+            datosDiarios[fecha].ventas.push(venta); // Almacenar la venta completa para el detalle
+        } else {
+             // Esto puede ocurrir si hay ventas guardadas que caen justo en el límite de los 7 días.
+            return;
+        }
+
+        // 2. Datos Productos
+        venta.items.forEach(item => {
+            const nombre = item.nombre;
+            const cantidad = item.cantidad || 0;
+            datosProductos[nombre] = (datosProductos[nombre] || 0) + cantidad;
+        });
+    });
+
+    // --- Preparación de datos para Chart.js ---
+    
+    // 1. Etiquetas de fecha (ej: Lun 18)
+    const etiquetasFecha = fechas.map(f => new Date(f + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' }));
+
+    // 2. Gráfico de Ganancia Diaria (Ganancia en Pesos)
+    const valoresGanancia = fechas.map(f => datosDiarios[f].ganancia);
+    
+    // 3. Gráfico de Transacciones Diarias (Número de Transacciones)
+    const valoresTransacciones = fechas.map(f => datosDiarios[f].transacciones);
+    
+    // 4. Gráfico de Productos Vendidos (Top 5)
+    const topProductos = Object.entries(datosProductos)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5);
+
+    const etiquetasProductos = topProductos.map(([nombre]) => nombre);
+    const valoresProductos = topProductos.map(([, cantidad]) => cantidad);
+    
+    return {
+        // Devolvemos el objeto completo para renderizar el detalle por día
+        ventasPorDia: datosDiarios, 
+        // Datos para los 3 gráficos
+        ganancia: { labels: etiquetasFecha, data: valoresGanancia },
+        productos: { labels: etiquetasProductos, data: valoresProductos },
+        transacciones: { labels: etiquetasFecha, data: valoresTransacciones }
+    };
+}
+
+function dibujarGraficos(datos) {
+    // Destruye instancias antiguas si existen
+    if (myChartGanancia) myChartGanancia.destroy();
+    if (myChartProductos) myChartProductos.destroy();
+    if (myChartTransacciones) myChartTransacciones.destroy();
+
+    // 1. GRÁFICO DE GANANCIA DIARIA (Ganancia en Pesos)
+    const ctxGanancia = document.getElementById('grafico-ganancia-diaria').getContext('2d');
+    myChartGanancia = new Chart(ctxGanancia, {
+        type: 'bar',
+        data: {
+            labels: datos.ganancia.labels,
+            datasets: [{
+                label: 'Ganancia Final (ARS)',
+                data: datos.ganancia.data,
+                backgroundColor: 'rgba(0, 166, 80, 0.7)', // Verde
+                borderColor: 'rgba(0, 166, 80, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'Monto (ARS)' } }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: (context) => `ARS ${formatearPrecio(context.parsed.y).replace(/\u00A0/g, ' ').replace('$', '')}` } }
+            }
+        }
+    });
+
+    // 2. GRÁFICO DE PRODUCTOS VENDIDOS (Top 5)
+    const ctxProductos = document.getElementById('grafico-productos-vendidos').getContext('2d');
+    myChartProductos = new Chart(ctxProductos, {
+        type: 'doughnut',
+        data: {
+            labels: datos.productos.labels,
+            datasets: [{
+                label: 'Cantidad Vendida',
+                data: datos.productos.data,
+                backgroundColor: ['#1976d2', '#ffd600', '#c62828', '#2e7d32', '#9c27b0'], // Colores corporativos y otros
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: { display: false },
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+
+    // 3. GRÁFICO DE TRANSACCIONES DIARIAS (Transacciones)
+    const ctxTransacciones = document.getElementById('grafico-transacciones-diarias').getContext('2d');
+    myChartTransacciones = new Chart(ctxTransacciones, {
+        type: 'line',
+        data: {
+            labels: datos.transacciones.labels,
+            datasets: [{
+                label: 'Transacciones',
+                data: datos.transacciones.data,
+                backgroundColor: 'rgba(25, 118, 210, 0.2)', // Azul claro
+                borderColor: 'rgba(25, 118, 210, 1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true,
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'Número de Ventas' }, ticks: { precision: 0 } }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+}
+
+
+async function cargarHistorialVentas() {
+    const listaCont = document.getElementById('historial-ventas-list');
+    const loader = document.getElementById('historial-loader');
+    
+    listaCont.innerHTML = '';
+    loader.style.display = 'block';
+
+    try {
+        // --- CÁLCULO DE RANGO DE FECHAS (ÚLTIMOS 7 DÍAS) ---
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0); 
+        
+        const haceSieteDias = new Date(hoy);
+        haceSieteDias.setDate(hoy.getDate() - 7); // Inicio hace 7 días (00:00:00)
+        
+        const timestampLimite = firebase.firestore.Timestamp.fromDate(haceSieteDias);
+        // --- FIN CÁLCULO DE RANGO DE FECHAS ---
+
+        // 1. Consultar ventas: solo las que ocurrieron a partir del inicio de "hace 7 días"
+        // NOTA: Se ha quitado el orderBy('fecha', 'desc') para evitar el error de índice
+        // y se ordenarán los datos en el cliente.
+        const snapshot = await db.collection(COLECCION_VENTAS)
+            .where('fecha', '>=', timestampLimite)
+            .get(); 
+        
+        const ventas = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        
+        // Ordenamos en el cliente para asegurar el orden cronológico
+        ventas.sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
+
+        // 2. Procesar datos para la lista y los gráficos
+        const datosProcesados = procesarDatosParaGraficos(ventas);
+
+        // 3. Dibujar los gráficos
+        dibujarGraficos(datosProcesados);
+        
+        // 4. Renderizar el detalle por día (usando las ventas agrupadas del procesamiento)
+        renderHistorialVentas(datosProcesados.ventasPorDia);
+
+    } catch (e) {
+        console.error("Error cargando historial de ventas:", e);
+        listaCont.innerHTML = '<p style="color:var(--rojo);">Error al cargar el historial de ventas. (Ver consola F12 para detalles)</p>';
+    } finally {
+        loader.style.display = 'none';
+}
+}
+
+function renderHistorialVentas(ventasPorDia) {
+    const listaCont = document.getElementById('historial-ventas-list');
+    // Ordenamos las fechas de forma descendente (más nueva primero)
+    const fechasOrdenadas = Object.keys(ventasPorDia).sort((a, b) => b.localeCompare(a)); 
+
+    if (fechasOrdenadas.length === 0) {
+        listaCont.innerHTML = '<p>No se encontraron ventas registradas en los últimos 7 días.</p>';
+        return;
+    }
+
+    fechasOrdenadas.forEach(fecha => {
+        const dataDia = ventasPorDia[fecha];
+        // Los datos ya vienen agrupados y contienen la lista de ventas dentro de 'dataDia.ventas'
+        
+        // Filtramos para asegurar que solo se muestren los días que tienen ventas guardadas
+        if (dataDia.ventas && dataDia.ventas.length === 0) return;
+        
+        const fechaLegible = new Date(fecha + 'T00:00:00').toLocaleDateString('es-AR', { dateStyle: 'full' });
+
+        const divDia = document.createElement('div');
+        divDia.className = 'historial-dia';
+        
+        divDia.innerHTML = `
+            <h3>
+                ${fechaLegible}
+                <span class="total-final-dia">${formatearPrecio(dataDia.ganancia).replace(/\u00A0/g, ' ')}</span>
+            </h3>
+            <div class="ventas-del-dia">
+                ${dataDia.ventas.map((venta, index) => `
+                    <div class="historial-item">
+                        <div class="item-detalle">
+                            <span style="font-weight:700;">#${dataDia.ventas.length - index} |</span>
+                            <span style="color:#777;">Final: ${formatearPrecio(venta.totalFinal).replace(/\u00A0/g, ' ')}</span>
+                            ${venta.montoDescuento > 0 ? `<span style="color:var(--rojo); font-weight:600;">(Dto: ${venta.porcentajeDescuento}%)</span>` : ''}
+                        </div>
+                        <div style="text-align:right;">
+                            ${venta.items.map(item => `
+                                <div style="font-weight:400;">${item.cantidad}x ${item.nombre}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        listaCont.appendChild(divDia);
+    });
+}
 
 
 // ---------------------- GENERACIÓN DE PDF ----------------------
@@ -475,6 +795,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnVaciarVenta = document.getElementById('btn-vaciar-venta');
   const btnConfirmarVenta = document.getElementById('btn-confirmar-venta');
   
+  // NUEVOS CONTROLES DE DESCUENTO
+  const inputDescuento = document.getElementById('venta-input-descuento');
+  const btnAplicarDescuento = document.getElementById('btn-aplicar-descuento');
+  const btnQuitarDescuento = document.getElementById('btn-quitar-descuento');
+  
+  // BOTONES DE NAVEGACIÓN
+  const btnShowProductos = document.getElementById('btn-show-productos');
+  const btnShowHistorial = document.getElementById('btn-show-historial');
+  
   // Cargar productos
   cargarProductosDesdeFirestore().catch(err => {
     console.error("Error cargando productos:", err);
@@ -485,6 +814,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnDescargarPDF) {
       btnDescargarPDF.addEventListener("click", generarPDFStock);
   }
+
+  // BOTONES DE NAVEGACIÓN (Escuchadores)
+  if (btnShowProductos) btnShowProductos.addEventListener('click', () => mostrarPanel('productos'));
+  if (btnShowHistorial) btnShowHistorial.addEventListener('click', () => mostrarPanel('historial'));
 
   // Buscar en vivo
   if (inputBuscador) {
@@ -499,6 +832,21 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnVaciarVenta) btnVaciarVenta.addEventListener('click', vaciarVenta);
   if (btnConfirmarVenta) btnConfirmarVenta.addEventListener('click', confirmarVenta);
 
+  // LISTENERS DE DESCUENTO
+  if (btnAplicarDescuento) btnAplicarDescuento.addEventListener('click', aplicarDescuento);
+  if (btnQuitarDescuento) btnQuitarDescuento.addEventListener('click', quitarDescuento);
+  
+  if (inputDescuento) {
+    // Aplicar descuento al presionar Enter o perder el foco
+    inputDescuento.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            aplicarDescuento();
+        }
+    });
+    inputDescuento.addEventListener('blur', aplicarDescuento);
+  }
+
   if (inputCodBarraVenta) {
       inputCodBarraVenta.addEventListener('keypress', (e) => {
           if (e.key === 'Enter') {
@@ -508,7 +856,6 @@ document.addEventListener("DOMContentLoaded", () => {
               inputCodBarraVenta.value = ''; // Limpiar campo después de escanear/ingresar
           }
       });
-      // Permite agregar si se pierde el foco (útil para escáneres que no envían Enter)
       inputCodBarraVenta.addEventListener('blur', () => {
           const codbarra = inputCodBarraVenta.value.trim();
           if (codbarra) {
