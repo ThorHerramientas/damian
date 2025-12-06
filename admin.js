@@ -76,20 +76,23 @@ function cargarProductoEnFormulario(id, prod) {
 
 function productosFiltrados() {
   if (!filtroTexto) return productos;
-  const t = filtroTexto.toLowerCase();
+  const t = filtroTexto.toLowerCase().trim();
   
-  // Normalizamos el texto de búsqueda (quitamos no-alfanuméricos)
-  const tNormalizado = filtroTexto.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  // 1. Normalizamos el texto de búsqueda y dividimos en palabras clave (AND logic)
+  const tNormalizado = filtroTexto.replace(/[^a-zA-Z0-9\s]/g, "").toLowerCase();
+  const keywords = tNormalizado.split(/\s+/).filter(k => k.length > 0);
 
   return productos.filter(p => {
     const d = p.data;
     
-    // Búsqueda normal (nombre, marca, descripción)
-    const textMatch = (d.nombre && d.nombre.toLowerCase().includes(t)) ||
-                      (d.marca && d.marca.toLowerCase().includes(t)) ||
-                      (d.descripcion && d.descripcion.toLowerCase().includes(t));
+    // 2. Búsqueda de palabra clave: NOMBRE, MARCA y DESCRIPCIÓN (AND logic)
+    const searchableText = (d.nombre || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
+    const searchableTextLower = searchableText.toLowerCase();
 
-    // Búsqueda por código de barras (soporta múltiples códigos)
+    // 3. Verifica que TODAS las palabras clave estén presentes en el texto buscable
+    const keywordMatch = keywords.every(keyword => searchableTextLower.includes(keyword));
+
+    // 4. Búsqueda por código de barras (soporta múltiples códigos)
     const codigosGuardados = d.codbarra ? d.codbarra.split(',') : [];
     
     const codbarraMatch = codigosGuardados.some(cod => {
@@ -97,7 +100,7 @@ function productosFiltrados() {
         return codbarraGuardadoNormalizado.includes(tNormalizado);
     });
     
-    return textMatch || codbarraMatch; // Coincide si alguna de las dos búsquedas coincide
+    return keywordMatch || codbarraMatch; // Coincide si alguna de las dos búsquedas coincide
   });
 }
 
@@ -261,6 +264,7 @@ function vaciarVenta() {
     const inputDescuento = document.getElementById('venta-input-descuento');
     if (inputDescuento) inputDescuento.value = ''; // Limpia el input de descuento
     renderVentaPanel();
+    renderVentaSuggestions([]); // Oculta sugerencias al vaciar
 }
 
 function abrirVenta() {
@@ -350,27 +354,49 @@ function renderVentaPanel() {
     totalFinalSpan.textContent = formatearPrecio(totalFinal).replace(/\u00A0/g, ' ');
 }
 
-function agregarProductoAVenta(codbarra) {
-    if (!codbarra) return;
+/**
+ * Función central de búsqueda para el POS:
+ * 1. Intenta encontrar por código de barras exacto (escáner).
+ * 2. Si falla, intenta encontrar por palabra clave en Nombre/Marca.
+ * @param {string} input Texto ingresado en el campo.
+ */
+function buscarProductoParaVenta(input) {
+    if (!input) return null;
+    
+    const inputLower = input.toLowerCase().trim();
+    const inputNormalizado = input.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 
-    const codbarraNormalizado = codbarra.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-
-    const productoEnStock = productos.find(p => {
-        if (!p.data.codbarra) return false;
-
-        const codigosGuardados = p.data.codbarra.split(',');
-
-        return codigosGuardados.some(guardado => {
-            const codbarraGuardadoNormalizado = guardado.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-            return codbarraGuardadoNormalizado === codbarraNormalizado;
+    // 1. Búsqueda por CÓDIGO DE BARRAS (Coincidencia exacta)
+    const matchByBarcode = productos.find(p => {
+        const codigosGuardados = p.data.codbarra ? p.data.codbarra.split(',') : [];
+        return codigosGuardados.some(cod => {
+            const codbarraGuardadoNormalizado = cod.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+            return codbarraGuardadoNormalizado === inputNormalizado; 
         });
     });
+    if (matchByBarcode) return [matchByBarcode]; // Devuelve el producto como array (para consistencia)
 
-    if (!productoEnStock) {
-        alert(`Producto con código de barras "${codbarra}" no encontrado. Asegúrese de que el código esté correctamente cargado en el formulario de producto.`);
-        return;
-    }
+    // 2. Búsqueda por PALABRA CLAVE (Nombre/Marca/Descripción)
+    const keywords = inputNormalizado.split(/\s+/).filter(k => k.length > 0);
+    
+    const matchesByKeyword = productos.filter(p => {
+        const d = p.data;
+        const searchableText = (d.nombre || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
+        const searchableTextLower = searchableText.toLowerCase();
 
+        // Verifica que TODAS las palabras clave estén presentes en el texto
+        return keywords.every(keyword => searchableTextLower.includes(keyword));
+    });
+
+    return matchesByKeyword; // Devuelve los matches por nombre (puede ser 0 o muchos)
+}
+
+
+/**
+ * Agrega un producto a la venta, asumiendo que se encontró por nombre o código.
+ * @param {object} productoEnStock Objeto de producto {id, data}.
+ */
+function agregarProductoEncontrado(productoEnStock) {
     const itemEnVenta = ventaActual.find(item => item.id === productoEnStock.id);
     const stockDisponible = Number(productoEnStock.data.stock) || 0;
     const cantidadActualVenta = itemEnVenta ? itemEnVenta.cantidad : 0;
@@ -390,9 +416,70 @@ function agregarProductoAVenta(codbarra) {
             cantidad: 1
         });
     }
-    
-    // Forzamos la actualización del panel al agregar un producto
+
     renderVentaPanel();
+}
+
+// Función que maneja la entrada de texto del POS (se llama desde el listener 'input')
+function liveSearchVenta() {
+    const inputEl = document.getElementById('venta-input-codbarra');
+    const listaSugerencias = document.getElementById('venta-sugerencias-list');
+    const input = inputEl.value;
+
+    if (input.length < 2) {
+        renderVentaSuggestions([]);
+        return;
+    }
+
+    // Usamos la misma lógica de búsqueda que agregamos arriba
+    const resultados = buscarProductoParaVenta(input);
+    
+    // Si la búsqueda devuelve UN resultado por coincidencia exacta de código, agrégalo directamente.
+    // Si la búsqueda devuelve MÁS DE UN resultado, muestra la lista.
+    if (resultados.length === 1 && (input.length === resultados[0].data.codbarra.replace(/[^a-zA-Z0-9]/g, "").length || input.length > 5)) {
+        agregarProductoEncontrado(resultados[0]);
+        inputEl.value = ''; // Limpia el input después de agregar por escáner/nombre exacto
+        renderVentaSuggestions([]); // Oculta la lista
+        return;
+    }
+
+    renderVentaSuggestions(resultados.slice(0, 8)); // Muestra hasta 8 sugerencias
+}
+
+// Renderiza la lista de sugerencias clicables
+function renderVentaSuggestions(sugerencias) {
+    const listaSugerencias = document.getElementById('venta-sugerencias-list');
+    listaSugerencias.innerHTML = '';
+
+    if (sugerencias.length === 0) {
+        listaSugerencias.classList.add('oculto');
+        return;
+    }
+
+    sugerencias.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'sugerencia-item';
+        div.dataset.id = p.id; // Almacenamos el ID para el click
+        div.innerHTML = `
+            <span>${p.data.nombre} (${p.data.marca || '-'})</span>
+            <span style="font-weight: 600;">${formatearPrecio(p.data.precio)}</span>
+        `;
+        div.addEventListener('click', (e) => {
+            const id = e.currentTarget.dataset.id;
+            const productoSeleccionado = productos.find(prod => prod.id === id);
+            
+            if (productoSeleccionado) {
+                agregarProductoEncontrado(productoSeleccionado);
+                const inputEl = document.getElementById('venta-input-codbarra');
+                inputEl.value = ''; // Limpia el campo después de la selección
+                inputEl.focus(); // Vuelve el foco para la próxima búsqueda/escaneo
+            }
+            renderVentaSuggestions([]); // Oculta la lista después de seleccionar
+        });
+        listaSugerencias.appendChild(div);
+    });
+
+    listaSugerencias.classList.remove('oculto');
 }
 
 
@@ -672,7 +759,7 @@ async function cargarHistorialVentas() {
         listaCont.innerHTML = '<p style="color:var(--rojo);">Error al cargar el historial de ventas. (Ver consola F12 para detalles)</p>';
     } finally {
         loader.style.display = 'none';
-}
+    }
 }
 
 function renderHistorialVentas(ventasPorDia) {
@@ -817,9 +904,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // BOTONES DE NAVEGACIÓN (Escuchadores)
   if (btnShowProductos) btnShowProductos.addEventListener('click', () => mostrarPanel('productos'));
-  if (btnShowHistorial) btnShowHistorial.addEventListener('click', () => mostrarPanel('historial'));
+  if (btnShowHistorial) btnShowHistorial.addEventListener('click', () => cargarHistorialVentas());
 
-  // Buscar en vivo
+  // Buscar en vivo (Tabla de productos principal)
   if (inputBuscador) {
     inputBuscador.addEventListener("input", () => {
       filtroTexto = inputBuscador.value.trim();
@@ -831,6 +918,32 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnRealizarVenta) btnRealizarVenta.addEventListener('click', abrirVenta);
   if (btnVaciarVenta) btnVaciarVenta.addEventListener('click', vaciarVenta);
   if (btnConfirmarVenta) btnConfirmarVenta.addEventListener('click', confirmarVenta);
+
+  // LISTENER DE AUTOSUGERENCIAS
+  if (inputCodBarraVenta) {
+    // Al escribir, buscar y mostrar sugerencias
+    inputCodBarraVenta.addEventListener('input', liveSearchVenta);
+    
+    // Si el usuario presiona ENTER, intenta agregar el producto
+    inputCodBarraVenta.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const codbarra = inputCodBarraVenta.value.trim();
+            // Buscar y agregar directamente si hay una coincidencia exacta, 
+            // o si solo hay 1 sugerencia, agregar esa.
+            const resultados = buscarProductoParaVenta(codbarra);
+            if (resultados.length === 1) {
+                agregarProductoEncontrado(resultados[0]);
+                inputCodBarraVenta.value = '';
+                renderVentaSuggestions([]);
+            } else {
+                 // Si presiona enter sin escribir, lo ignoramos. Si hay múltiples, no hacemos nada.
+                 alert("Por favor, seleccione un producto de la lista o refine su búsqueda.");
+            }
+        }
+    });
+  }
+
 
   // LISTENERS DE DESCUENTO
   if (btnAplicarDescuento) btnAplicarDescuento.addEventListener('click', aplicarDescuento);
@@ -847,88 +960,7 @@ document.addEventListener("DOMContentLoaded", () => {
     inputDescuento.addEventListener('blur', aplicarDescuento);
   }
 
-  if (inputCodBarraVenta) {
-      inputCodBarraVenta.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter') {
-              e.preventDefault();
-              const codbarra = inputCodBarraVenta.value.trim();
-              agregarProductoAVenta(codbarra);
-              inputCodBarraVenta.value = ''; // Limpiar campo después de escanear/ingresar
-          }
-      });
-      inputCodBarraVenta.addEventListener('blur', () => {
-          const codbarra = inputCodBarraVenta.value.trim();
-          if (codbarra) {
-              agregarProductoAVenta(codbarra);
-              inputCodBarraVenta.value = ''; 
-          }
-      });
-  }
-  // ----------------------------------------------------
-
-
-  // Guardar / actualizar (Formulario)
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const id = document.getElementById("prod-id").value.trim();
-    const nombre = document.getElementById("prod-nombre").value.trim();
-    const marca = document.getElementById("prod-marca").value.trim();
-    const precio = Number(document.getElementById("prod-precio").value || 0);
-    const stock = Number(document.getElementById("prod-stock").value || 0);
-    const alimentacion = document.getElementById("prod-alimentacion").value;
-    const codbarra = document.getElementById("prod-codbarra").value.trim(); // Campo Código de Barras
-    const imagenTexto = document.getElementById("prod-imagen").value.trim();
-    const descripcion = document.getElementById("prod-descripcion").value.trim();
-    const enviosText = document.getElementById("prod-envios").value;
-    const detallesText = document.getElementById("prod-detalles").value;
-
-    if (!nombre) {
-      alert("El nombre es obligatorio.");
-      return;
-    }
-
-    const opcionesEnvio = enviosText.split(",").map(t => t.trim()).filter(Boolean);
-    const detalles = detallesText.split("\n").map(t => t.trim()).filter(Boolean);
-
-    const imagenes = imagenTexto
-      ? imagenTexto.split(",").map(u => u.trim()).filter(Boolean)
-      : [];
-    const imagenPlaceholder = "https://via.placeholder.com/300x200?text=Producto";
-    const imagenPrincipal = imagenes.length > 0 ? imagenes[0] : imagenPlaceholder;
-
-    const producto = {
-      nombre,
-      marca,
-      precio,
-      stock,
-      alimentacion, 
-      codbarra, // Campo Código de Barras
-      imagen: imagenPrincipal,
-      imagenes,
-      descripcion,
-      opcionesEnvio,
-      detalles
-    };
-
-    try {
-      if (id) {
-        await productosRef.doc(id).update(producto);
-        alert("Producto actualizado correctamente.");
-      } else {
-        await productosRef.add(producto);
-        alert("Producto creado correctamente.");
-      }
-      limpiarFormulario();
-      await cargarProductosDesdeFirestore(); // actualiza lista + estadísticas
-    } catch (err) {
-      console.error("Error guardando producto:", err);
-      alert("Hubo un error guardando el producto.");
-    }
-  });
-
-  btnLimpiar.addEventListener("click", () => limpiarFormulario());
-
+  
   // Escucha los clics en la tabla para +/- y Editar/Eliminar
   tbody.addEventListener("click", async (e) => {
     const accion = e.target.dataset.accion;

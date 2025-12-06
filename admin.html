@@ -282,20 +282,31 @@
       text-align: center;
       color: var(--primario);
   }
+  /* ESTILOS DE SUGERENCIAS DE VENTA RÁPIDA */
+    .sugerencia-item {
+        padding: 8px 12px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        font-size: 14px;
+    }
+    .sugerencia-item:hover {
+        background-color: #f0f0f0;
+    }
+
   
-  /* INICIO DEL CAMBIO: MOBILE RESPONSIVE FIXES */
-  /* Forzamos el apilamiento de gráficos y corrección de la tarjeta que abarca 2 columnas */
+  /* MOBILE RESPONSIVE FIXES */
   @media (max-width: 768px) {
       .graficos-container {
-          grid-template-columns: 1fr !important; /* Apila todos los gráficos en una sola columna */
+          grid-template-columns: 1fr !important;
       }
       .grafico-card:last-child {
-          grid-column: auto !important; /* Anula el span de 2 columnas para el tercer gráfico */
+          grid-column: auto !important;
       }
   }
 
   @media (max-width: 600px) {
-      /* Estilos para apilar los detalles de la venta */
       .historial-dia h3 {
            font-size: 14px;
            flex-direction: column;
@@ -316,15 +327,12 @@
            font-size: 16px;
       }
       .item-detalle {
-           /* Asegura que el detalle de la transacción esté en una línea legible */
            font-size: 13px;
       }
       .item-detalle span:last-child {
-           /* Para el descuento/total final en el detalle */
            display: block; 
       }
   }
-  /* FIN DEL CAMBIO: MOBILE RESPONSIVE FIXES */
   </style>
 </head>
 <body>
@@ -536,23 +544,47 @@ Garantía: 1 año"></textarea>
 
 
 <div id="venta-backdrop" class="login-overlay oculto" style="z-index: 9900;">
-  <div id="venta-panel" class="login-card" style="max-width: 500px; width: 95%; text-align: left; padding: 20px 25px; border-top: 4px solid var(--primario); position: relative;">
+  <div id="venta-panel" class="login-card" style="
+      max-width: 500px; width: 95%; text-align: left; padding: 20px 25px; 
+      border-top: 4px solid var(--primario); position: relative;
+      /* FIX: Permite el desplazamiento interno */
+      display: flex; flex-direction: column; max-height: 95vh;
+  ">
     <button id="btn-cerrar-venta" onclick="cerrarVenta()" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 20px; cursor: pointer;">✕</button>
     <div class="login-icon" style="border-color: var(--primario); color: var(--primario);">🛒</div>
     <h2 style="color: var(--primario);">Realizar Venta Rápida</h2>
-    <p style="margin-bottom: 10px;">Escaneá el código de barras o ingresalo manualmente.</p>
+    <p style="margin-bottom: 10px;">Busque por nombre o código de barras.</p>
 
-    <div style="margin-bottom: 15px;">
-        <label for="venta-input-codbarra" style="font-size: 14px;">Código de Barras</label>
-        <input type="text" id="venta-input-codbarra" placeholder="Escaneá o ingresá código..." style="padding: 8px 10px; border-radius: 6px; border: 1px solid #ccc; width: 100%; font-size: 15px; box-sizing: border-box;">
+    <div id="autocomplete-container" style="position: relative; margin-bottom: 15px;">
+        <label for="venta-input-codbarra" style="font-size: 14px;">Código / Nombre</label>
+        <input type="text" id="venta-input-codbarra" placeholder="Escriba aquí para buscar..." style="padding: 8px 10px; border-radius: 6px; border: 1px solid #ccc; width: 100%; font-size: 15px; box-sizing: border-box;">
+
+        <div id="venta-sugerencias-list" class="oculto" style="
+            position: absolute;
+            top: 100%; /* Justo debajo del input */
+            left: 0;
+            width: 100%;
+            z-index: 10;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-top: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-height: 200px;
+            overflow-y: auto;
+        ">
+            </div>
     </div>
-
     <h3 style="font-size: 16px; margin-bottom: 8px;">Detalle de la Venta:</h3>
     
-    <div id="venta-items-list" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--borde); border-radius: 4px; padding: 10px; margin-bottom: 10px; background: #fafafa; font-size: 13px;">
+    <div id="venta-items-list" style="
+        /* FIX: Permite que la lista crezca y tenga scroll propio */
+        flex-grow: 1;
+        overflow-y: auto;
+        border: 1px solid var(--borde); border-radius: 4px; padding: 10px; margin-bottom: 10px; background: #fafafa; font-size: 13px;
+    ">
       </div>
 
-    <div id="venta-totales-display" style="border-top: 1px solid #ddd; padding-top: 10px;">
+    <div id="venta-totales-display" style="border-top: 1px solid #ddd; padding-top: 10px; flex-shrink: 0;">
         <p style="font-size: 14px; font-weight: 500; color: #777;">
             Total sin Dto.: <span id="venta-total-sin-dto-display" style="float:right;">$ 0</span>
         </p>
@@ -564,14 +596,14 @@ Garantía: 1 año"></textarea>
         </p>
     </div>
 
-    <div style="margin-top: 15px; display: flex; align-items: center; gap: 10px;">
+    <div style="margin-top: 15px; display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
         <input type="number" id="venta-input-descuento" min="0" max="100" placeholder="Descuento (%)" 
                style="padding: 8px; border-radius: 6px; border: 1px solid #ccc; flex-grow: 1; max-width: 150px; font-size: 14px; box-sizing: border-box;">
         <button id="btn-aplicar-descuento" class="btn-secundario" style="flex-shrink: 0; padding: 8px 12px; border-radius: 4px;">Aplicar Dto.</button>
         <button id="btn-quitar-descuento" class="btn-secundario" style="flex-shrink: 0; padding: 8px 12px; border-radius: 4px; background-color: #fce4e4; color: var(--rojo);">Quitar</button>
     </div>
 
-    <div style="display: flex; gap: 10px; margin-top: 15px;">
+    <div style="display: flex; gap: 10px; margin-top: 15px; flex-shrink: 0;">
         <button id="btn-vaciar-venta" class="btn-secundario" style="flex: 1; border-radius: 4px; padding: 10px;">Vaciar Venta</button>
         <button id="btn-confirmar-venta" class="btn-principal" style="flex: 2; background-color: #00a650; border-radius: 4px; padding: 10px;">Confirmar Venta</button>
     </div>

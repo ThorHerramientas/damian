@@ -76,7 +76,7 @@ function actualizarMetaTagsProducto(producto) {
     // Valores por defecto
     const defaultTitle = "Thor Herramientas - Tu pasión, nuestra potencia";
     const defaultDescription = "Encontrá herramientas profesionales de calidad para talleres y construcción.";
-    const defaultImage = "https://via.placeholder.com/600x400?text=Thor+Herramientas";
+    const defaultImage = "https://via.placeholder.com/600x400?text=Thor+Herramientas+Logo"; // Usar el mismo que en HTML
     
     let title, description, image, url;
 
@@ -85,8 +85,9 @@ function actualizarMetaTagsProducto(producto) {
         const imagenPrincipal = imagenes[0];
         
         title = producto.nombre + ' | Thor Herramientas';
-        description = producto.descripcion || `Precio: ${formatearPrecio(producto.precio)}. Stock: ${producto.stock}.`;
-        image = makeAbsoluteUrl(imagenPrincipal); // APLICAMOS LA FUNCIÓN DE URL ABSOLUTA AQUÍ
+        // Descuento: Incluir precio y stock de forma destacada en la descripción para la vista previa
+        description = `Precio: ${formatearPrecio(producto.precio)}. Stock: ${producto.stock}. ${producto.descripcion || ''}`; 
+        image = makeAbsoluteUrl(imagenPrincipal); 
         url = buildProductURL(producto.id);
     } else {
         title = defaultTitle;
@@ -98,16 +99,16 @@ function actualizarMetaTagsProducto(producto) {
     // Actualiza las meta tags
     document.title = title;
     
-    // Función auxiliar para actualizar meta tags por ID
-    const setMetaContent = (id, content) => {
-        const tag = document.getElementById(id);
+    // Función auxiliar para actualizar meta tags por propiedad
+    const setMetaContent = (property, content) => {
+        const tag = document.querySelector(`meta[property="${property}"]`);
         if (tag) tag.setAttribute('content', content);
     };
 
-    setMetaContent('og-title', title);
-    setMetaContent('og-description', description);
-    setMetaContent('og-image', image);
-    setMetaContent('og-url', url);
+    setMetaContent('og:title', title);
+    setMetaContent('og:description', description);
+    setMetaContent('og:image', image);
+    setMetaContent('og:url', url);
 }
 // ----------------------------------------------------------------------------------
 
@@ -122,13 +123,13 @@ async function cargarProductosDesdeFirestore() {
     }));
 }
 
-// ---------------------- CARRITO (LÓGICA) -------------------------
+// ---------------------- LISTA DE COMPRAS (LÓGICA) -------------------------
 
 function guardarCarrito() {
     try {
         localStorage.setItem("carritoHerramientas", JSON.stringify(carrito));
     } catch (e) {
-        console.warn("No se pudo guardar el carrito", e);
+        console.warn("No se pudo guardar la lista de compras", e);
     }
 }
 
@@ -180,7 +181,7 @@ function comprarAhora(idProducto) {
 function cambiarCantidad(idProducto, delta) {
     const item = carrito.find(i => i.id === idProducto);
     if (!item) return;
-    const producto = obtenerProductoPorId(idProducto);
+    const producto = obtenerProductoPorId(item.id);
     if (!producto) return;
 
     if (delta > 0 && item.cantidad >= producto.stock) {
@@ -216,7 +217,7 @@ function calcularTotalCarrito() {
     }, 0);
 }
 
-// ---------------------- UI CARRITO ----------------------
+// ---------------------- UI LISTA DE COMPRAS ----------------------
 
 function actualizarCarritoUI() {
     const contenedor = document.getElementById("carrito-items");
@@ -228,7 +229,7 @@ function actualizarCarritoUI() {
     contenedor.innerHTML = "";
 
     if (carrito.length === 0) {
-        contenedor.innerHTML = "<p>Tu carrito está vacío.</p>";
+        contenedor.innerHTML = "<p>Tu lista de compras está vacía.</p>";
         totalSpan.textContent = formatearPrecio(0);
         btnFinalizar.classList.add("deshabilitado");
     } else {
@@ -267,34 +268,16 @@ function obtenerEnvioSeleccionado() {
     return select.value;
 }
 
-// ✅ Función modificada: El campo de envío ya no es obligatorio.
+// FUNCIÓN DE WHATSAPP SIMPLIFICADA (SIN PROMPTS)
 function generarLinkWhatsAppCarrito() {
     if (carrito.length === 0) {
-        alert("El carrito está vacío.");
+        alert("La lista de compras está vacía.");
         return null;
     }
 
     const envio = obtenerEnvioSeleccionado();
     
-    // --- VALIDACIÓN DE ENVÍO ELIMINADA ---
-    // if (envio === "") {
-    //     alert("Seleccioná una opción de envío en el carrito antes de iniciar la compra.");
-    //     return null;
-    // }
-    // ------------------------------------
-
-    const nombre = prompt("Nombre y apellido del cliente:");
-    if (nombre === null) return null;
-
-    let direccionCompleta = "";
-    if (envio === "Envío a domicilio" || envio === "Envío a todo el país") {
-        const calleAltura = prompt("Calle y altura del cliente:");
-        if (calleAltura === null) return null;
-        const localidad = prompt("Localidad del cliente:");
-        if (localidad === null) return null;
-        direccionCompleta = `${(calleAltura || "").trim()} - ${(localidad || "").trim()}`;
-    }
-
+    // Eliminamos todos los prompts de datos del cliente
     let texto = "Hola Thor, quiero hacer este pedido:\n";
     carrito.forEach(item => {
         const producto = obtenerProductoPorId(item.id);
@@ -304,18 +287,12 @@ function generarLinkWhatsAppCarrito() {
     });
 
     texto += `\nTotal: ${formatearPrecio(calcularTotalCarrito())}\n`;
-    // --- MEJORA: Si no se eligió, muestra "No especificado" ---
     texto += `Opción de envío: ${envio || "No especificado"}\n\n`;
-    // --------------------------------------------------------
-    
-    texto += "Datos del cliente:\n";
-    texto += `Nombre: ${nombre || "-"}\n`;
-    if (direccionCompleta) {
-        texto += `Dirección: ${direccionCompleta}\n`;
-    }
+    texto += "Mis datos los confirmo por este chat."; // Mensaje para que el cliente ingrese sus datos
 
     const mensaje = encodeURIComponent(texto);
-    return `https://wa.me/${NUMERO_WHATSAPP}?text=${mensaje}`;
+    // Lo lleva directamente a WhatsApp con el mensaje pre-cargado
+    return `https://wa.me/${NUMERO_WHATSAPP}?text=${mensaje}`; 
 }
 
 // ---------------------- FILTROS Y LISTA ------------------
@@ -370,9 +347,7 @@ function renderProductos(lista) {
             botonesHTML = `
                 <div class="btn-agregar-contenedor">
                     <div class="acciones-producto">
-                        <button class="btn-agregar" data-id="${producto.id}">Agregar al carrito</button>
-                        <button class="btn-comprar-ahora" data-id="${producto.id}">Comprar ahora</button>
-                    </div>
+                        <button class="btn-agregar" data-id="${producto.id}">Agregar a mi lista</button> <button class="btn-comprar-ahora" data-id="${producto.id}">Quiero este artículo</button> </div>
                 </div>
             `;
         }
@@ -405,10 +380,12 @@ function aplicarFiltros() {
     // FIN DEL CAMBIO
     const ordenPrecio = document.getElementById("orden-precio");
 
-    const texto = textoInput ? textoInput.value.toLowerCase() : "";
+    const texto = textoInput ? textoInput.value.toLowerCase().trim() : "";
     const marca = filtroMarca ? filtroMarca.value : "todas";
-    // Normalizamos el texto de búsqueda para el código de barras
-    const tNormalizado = texto.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+    
+    // 1. Normalizamos el texto de búsqueda y dividimos en palabras clave (AND logic)
+    const tNormalizado = texto.replace(/[^a-zA-Z0-9\s]/g, "").toLowerCase();
+    const keywords = tNormalizado.split(/\s+/).filter(k => k.length > 0);
 
     // INICIO DEL CAMBIO: Usar el valor del filtro de alimentación
     const filtroAlimentacionValue = filtroAlimentacion ? filtroAlimentacion.value : "todos"; 
@@ -418,18 +395,21 @@ function aplicarFiltros() {
     let filtrados = productos.filter(p => {
         const d = p; // p es el objeto producto
         
-        // Búsqueda normal (nombre, marca, descripción)
-        const textMatch = (d.nombre && d.nombre.toLowerCase().includes(texto)) ||
-                          (d.descripcion || "").toLowerCase().includes(texto);
-                          
-        // Búsqueda por código de barras (normalizado)
+        // 2. Búsqueda de palabra clave: NOMBRE, MARCA y DESCRIPCIÓN (AND logic)
+        const searchableText = (d.nombre || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
+        const searchableTextLower = searchableText.toLowerCase();
+
+        // 3. Verifica que TODAS las palabras clave estén presentes en el texto buscable
+        const keywordMatch = keywords.every(keyword => searchableTextLower.includes(keyword));
+        
+        // 4. Búsqueda por código de barras (normalizado) - si el texto es un posible código
         const codigosGuardados = d.codbarra ? d.codbarra.split(',') : [];
         const codbarraMatch = codigosGuardados.some(cod => {
             const codbarraGuardadoNormalizado = cod.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
             return codbarraGuardadoNormalizado.includes(tNormalizado);
         });
 
-        const coincideTexto = textMatch || codbarraMatch;
+        const coincideTexto = keywordMatch || codbarraMatch;
 
 
         const coincideMarca = marca === "todas" ? true : p.marca === marca;
@@ -478,9 +458,7 @@ function abrirDetalleProducto(idProducto) {
     } else {
         botonesHTML = `
             <div class="detalle-botones">
-                <button class="btn-agregar" data-id="${producto.id}">Agregar al carrito</button>
-                <button class="btn-comprar-ahora" data-id="${producto.id}">Comprar ahora</button>
-            </div>
+                <button class="btn-agregar" data-id="${producto.id}">Agregar a mi lista</button> <button class="btn-comprar-ahora" data-id="${producto.id}">Quiero este artículo</button> </div>
         `;
     }
 
@@ -647,7 +625,7 @@ function abrirImagenAmpliada(src) {
     };
 }
 
-// ---------------------- PANEL CARRITO --------------------
+// ---------------------- PANEL LISTA DE COMPRAS --------------------
 
 function abrirCarrito() {
     const panel = document.getElementById("carrito-panel");

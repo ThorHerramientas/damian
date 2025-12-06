@@ -20,7 +20,7 @@ main {
 
 /* HEADER */
 .header {
-    background-color: #ffd600; 
+    background-color: #00B5E2; /* CAMBIO DE COLOR: Cian/Azul */ 
     padding: 15px 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     display: flex;
@@ -824,7 +824,7 @@ footer {
     .btn-quienes-somos {
         padding: 6px 15px; 
         font-size: 13px;
-        margin: 0 8px; 
+        margin: 0 auto; 
         flex-shrink: 0; 
     }
 
