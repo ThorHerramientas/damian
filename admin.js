@@ -361,22 +361,23 @@ function renderVentaPanel() {
  * @param {string} input Texto ingresado en el campo.
  */
 function buscarProductoParaVenta(input) {
-    if (!input) return null;
+    if (!input) return [];
     
     const inputLower = input.toLowerCase().trim();
     const inputNormalizado = input.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 
     // 1. Búsqueda por CÓDIGO DE BARRAS (Coincidencia exacta)
     const matchByBarcode = productos.find(p => {
-        const codigosGuardados = p.data.codbarra ? p.data.codbarra.split(',') : [];
+        const codigosGuardados = p.data.codbarra ? p.codbarra.split(',') : [];
         return codigosGuardados.some(cod => {
             const codbarraGuardadoNormalizado = cod.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
             return codbarraGuardadoNormalizado === inputNormalizado; 
         });
     });
-    if (matchByBarcode) return [matchByBarcode]; // Devuelve el producto como array (para consistencia)
+    if (matchByBarcode) return [matchByBarcode]; // Si hay coincidencia exacta de código, devuelve SOLO ESE.
 
     // 2. Búsqueda por PALABRA CLAVE (Nombre/Marca/Descripción)
+    // Utilizamos la lógica de palabras clave (AND) para evitar resultados irrelevantes.
     const keywords = inputNormalizado.split(/\s+/).filter(k => k.length > 0);
     
     const matchesByKeyword = productos.filter(p => {
@@ -384,8 +385,10 @@ function buscarProductoParaVenta(input) {
         const searchableText = (d.nombre || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
         const searchableTextLower = searchableText.toLowerCase();
 
-        // Verifica que TODAS las palabras clave estén presentes en el texto
-        return keywords.every(keyword => searchableTextLower.includes(keyword));
+        // Verifica que TODAS las palabras clave estén presentes
+        const keywordMatch = keywords.every(keyword => searchableTextLower.includes(keyword));
+        
+        return keywordMatch;
     });
 
     return matchesByKeyword; // Devuelve los matches por nombre (puede ser 0 o muchos)
@@ -423,7 +426,6 @@ function agregarProductoEncontrado(productoEnStock) {
 // Función que maneja la entrada de texto del POS (se llama desde el listener 'input')
 function liveSearchVenta() {
     const inputEl = document.getElementById('venta-input-codbarra');
-    const listaSugerencias = document.getElementById('venta-sugerencias-list');
     const input = inputEl.value;
 
     if (input.length < 2) {
@@ -431,30 +433,40 @@ function liveSearchVenta() {
         return;
     }
 
-    // Usamos la misma lógica de búsqueda que agregamos arriba
     const resultados = buscarProductoParaVenta(input);
     
     // Si la búsqueda devuelve UN resultado por coincidencia exacta de código, agrégalo directamente.
-    // Si la búsqueda devuelve MÁS DE UN resultado, muestra la lista.
-    if (resultados.length === 1 && (input.length === resultados[0].data.codbarra.replace(/[^a-zA-Z0-9]/g, "").length || input.length > 5)) {
-        agregarProductoEncontrado(resultados[0]);
-        inputEl.value = ''; // Limpia el input después de agregar por escáner/nombre exacto
-        renderVentaSuggestions([]); // Oculta la lista
-        return;
+    if (resultados.length === 1 && (
+        (resultados[0].data.codbarra && resultados[0].data.codbarra.includes(input)) || 
+        (input.length > 5 && (resultados[0].data.nombre || '').toLowerCase().includes(input.toLowerCase())) 
+    )) {
+        // Si el usuario escribe una palabra clave larga o un código, mostramos sugerencias
+        // para dar oportunidad al clic, pero si es un código exacto, debe ir directo.
+        if (buscarProductoParaVenta(input).length === 1 && buscarProductoParaVenta(input)[0].data.codbarra && buscarProductoParaVenta(input)[0].data.codbarra.includes(input)) {
+             agregarProductoEncontrado(resultados[0]);
+             inputEl.value = '';
+             renderVentaSuggestions([]);
+             return;
+        }
     }
-
+    
+    // Si hay más de un resultado o la búsqueda es parcial por nombre, muestra la lista
     renderVentaSuggestions(resultados.slice(0, 8)); // Muestra hasta 8 sugerencias
 }
 
 // Renderiza la lista de sugerencias clicables
 function renderVentaSuggestions(sugerencias) {
     const listaSugerencias = document.getElementById('venta-sugerencias-list');
-    listaSugerencias.innerHTML = '';
-
-    if (sugerencias.length === 0) {
+    const inputEl = document.getElementById('venta-input-codbarra');
+    
+    // Si el campo de búsqueda está vacío, no mostramos nada.
+    if (!inputEl.value.trim() || sugerencias.length === 0) {
         listaSugerencias.classList.add('oculto');
+        listaSugerencias.innerHTML = '';
         return;
     }
+
+    listaSugerencias.innerHTML = '';
 
     sugerencias.forEach(p => {
         const div = document.createElement('div');
@@ -871,7 +883,6 @@ function generarPDFStock() {
 
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("form-producto");
-  const btnLimpiar = document.getElementById("btn-limpiar-form");
   const tbody = document.getElementById("tabla-productos-body");
   const inputBuscador = document.getElementById("buscador-admin");
   const btnDescargarPDF = document.getElementById("btn-descargar-stock-pdf"); 
@@ -914,6 +925,76 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // **********************************************
+  // INICIO: Lógica del Formulario de Productos (GUARDAR/EDITAR)
+  // **********************************************
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault(); // IMPEDIR que el formulario se envíe de forma tradicional
+
+    const id = document.getElementById("prod-id").value.trim();
+    const nombre = document.getElementById("prod-nombre").value.trim();
+    const marca = document.getElementById("prod-marca").value.trim();
+    const precio = Number(document.getElementById("prod-precio").value || 0);
+    const stock = Number(document.getElementById("prod-stock").value || 0);
+    const alimentacion = document.getElementById("prod-alimentacion").value;
+    const codbarra = document.getElementById("prod-codbarra").value.trim(); // Campo Código de Barras
+    const imagenTexto = document.getElementById("prod-imagen").value.trim();
+    const descripcion = document.getElementById("prod-descripcion").value.trim();
+    const enviosText = document.getElementById("prod-envios").value;
+    const detallesText = document.getElementById("prod-detalles").value;
+
+    if (!nombre) {
+      alert("El nombre es obligatorio.");
+      return;
+    }
+
+    const opcionesEnvio = enviosText.split(",").map(t => t.trim()).filter(Boolean);
+    const detalles = detallesText.split("\n").map(t => t.trim()).filter(Boolean);
+
+    const imagenes = imagenTexto
+      ? imagenTexto.split(",").map(u => u.trim()).filter(Boolean)
+      : [];
+    const imagenPlaceholder = "https://via.placeholder.com/300x200?text=Producto";
+    const imagenPrincipal = imagenes.length > 0 ? imagenes[0] : imagenPlaceholder;
+
+    const producto = {
+      nombre,
+      marca,
+      precio,
+      stock,
+      alimentacion, 
+      codbarra, // Campo Código de Barras
+      imagen: imagenPrincipal,
+      imagenes,
+      descripcion,
+      opcionesEnvio,
+      detalles
+    };
+
+    try {
+      if (id) {
+        // Lógica de EDICIÓN (UPDATE)
+        await productosRef.doc(id).update(producto);
+        alert("Producto actualizado correctamente.");
+      } else {
+        // Lógica de CREACIÓN (ADD)
+        await productosRef.add(producto);
+        alert("Producto creado correctamente.");
+      }
+      
+      limpiarFormulario();
+      await cargarProductosDesdeFirestore(); // Recarga la lista para ver el cambio
+      
+    } catch (err) {
+      console.error("Error guardando producto:", err);
+      alert("Hubo un error guardando el producto.");
+    }
+  });
+  // **********************************************
+  // FIN: Lógica del Formulario de Productos (GUARDAR/EDITAR)
+  // **********************************************
+
+
   // ------------- LISTENERS VENTA RÁPIDA -------------
   if (btnRealizarVenta) btnRealizarVenta.addEventListener('click', abrirVenta);
   if (btnVaciarVenta) btnVaciarVenta.addEventListener('click', vaciarVenta);
@@ -929,18 +1010,24 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.key === 'Enter') {
             e.preventDefault();
             const codbarra = inputCodBarraVenta.value.trim();
-            // Buscar y agregar directamente si hay una coincidencia exacta, 
-            // o si solo hay 1 sugerencia, agregar esa.
+            
             const resultados = buscarProductoParaVenta(codbarra);
+            
+            // Si hay una única coincidencia (ya sea por código exacto o nombre exacto)
             if (resultados.length === 1) {
                 agregarProductoEncontrado(resultados[0]);
                 inputCodBarraVenta.value = '';
                 renderVentaSuggestions([]);
             } else {
-                 // Si presiona enter sin escribir, lo ignoramos. Si hay múltiples, no hacemos nada.
                  alert("Por favor, seleccione un producto de la lista o refine su búsqueda.");
             }
         }
+    });
+    
+    // Al perder el foco (si no es porque seleccionó algo), ocultar la lista
+    inputCodBarraVenta.addEventListener('blur', () => {
+         // Se añade un pequeño retraso para permitir que el evento 'click' en la sugerencia se dispare primero.
+         setTimeout(() => renderVentaSuggestions([]), 200);
     });
   }
 
@@ -1005,4 +1092,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await actualizarStockRapidoPorInput(id, nuevoValor);
     }
   });
+  
+  // Limpiar formulario al hacer clic en el botón
+  document.getElementById("btn-limpiar-form").addEventListener("click", () => limpiarFormulario());
 });
