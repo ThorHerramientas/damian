@@ -368,7 +368,8 @@ function buscarProductoParaVenta(input) {
 
     // 1. Búsqueda por CÓDIGO DE BARRAS (Coincidencia exacta)
     const matchByBarcode = productos.find(p => {
-        const codigosGuardados = p.data.codbarra ? p.codbarra.split(',') : [];
+        // Debemos acceder a p.data.codbarra ya que p es {id, data}
+        const codigosGuardados = p.data.codbarra ? p.data.codbarra.split(',') : [];
         return codigosGuardados.some(cod => {
             const codbarraGuardadoNormalizado = cod.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
             return codbarraGuardadoNormalizado === inputNormalizado; 
@@ -377,7 +378,6 @@ function buscarProductoParaVenta(input) {
     if (matchByBarcode) return [matchByBarcode]; // Si hay coincidencia exacta de código, devuelve SOLO ESE.
 
     // 2. Búsqueda por PALABRA CLAVE (Nombre/Marca/Descripción)
-    // Utilizamos la lógica de palabras clave (AND) para evitar resultados irrelevantes.
     const keywords = inputNormalizado.split(/\s+/).filter(k => k.length > 0);
     
     const matchesByKeyword = productos.filter(p => {
@@ -436,18 +436,16 @@ function liveSearchVenta() {
     const resultados = buscarProductoParaVenta(input);
     
     // Si la búsqueda devuelve UN resultado por coincidencia exacta de código, agrégalo directamente.
-    if (resultados.length === 1 && (
-        (resultados[0].data.codbarra && resultados[0].data.codbarra.includes(input)) || 
-        (input.length > 5 && (resultados[0].data.nombre || '').toLowerCase().includes(input.toLowerCase())) 
+    // Esto maneja el escáner rápido o si el usuario escribe un código exacto.
+    if (resultados.length === 1 && buscarProductoParaVenta(input).length === 1 && (
+        (resultados[0].data.codbarra && resultados[0].data.codbarra.includes(input)) 
     )) {
-        // Si el usuario escribe una palabra clave larga o un código, mostramos sugerencias
-        // para dar oportunidad al clic, pero si es un código exacto, debe ir directo.
-        if (buscarProductoParaVenta(input).length === 1 && buscarProductoParaVenta(input)[0].data.codbarra && buscarProductoParaVenta(input)[0].data.codbarra.includes(input)) {
-             agregarProductoEncontrado(resultados[0]);
-             inputEl.value = '';
-             renderVentaSuggestions([]);
-             return;
-        }
+        
+        // Es una coincidencia exacta de código, agregar y limpiar.
+         agregarProductoEncontrado(resultados[0]);
+         inputEl.value = '';
+         renderVentaSuggestions([]);
+         return;
     }
     
     // Si hay más de un resultado o la búsqueda es parcial por nombre, muestra la lista
@@ -926,10 +924,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // **********************************************
-  // INICIO: Lógica del Formulario de Productos (GUARDAR/EDITAR)
+  // Lógica del Formulario de Productos (GUARDAR/EDITAR)
   // **********************************************
   form.addEventListener("submit", async (e) => {
-    e.preventDefault(); // IMPEDIR que el formulario se envíe de forma tradicional
+    e.preventDefault(); 
 
     const id = document.getElementById("prod-id").value.trim();
     const nombre = document.getElementById("prod-nombre").value.trim();
@@ -990,10 +988,6 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Hubo un error guardando el producto.");
     }
   });
-  // **********************************************
-  // FIN: Lógica del Formulario de Productos (GUARDAR/EDITAR)
-  // **********************************************
-
 
   // ------------- LISTENERS VENTA RÁPIDA -------------
   if (btnRealizarVenta) btnRealizarVenta.addEventListener('click', abrirVenta);
