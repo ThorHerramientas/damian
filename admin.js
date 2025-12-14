@@ -267,6 +267,24 @@ function vaciarVenta() {
     renderVentaSuggestions([]); // Oculta sugerencias al vaciar
 }
 
+// NUEVA FUNCIÓN: Eliminar un ítem individualmente
+function eliminarItemVenta(idProducto) {
+    const confirmar = confirm("¿Estás seguro de que deseas eliminar este producto de la venta?");
+    if (!confirmar) return;
+    
+    // Filtramos la venta actual, dejando fuera el producto con el ID especificado
+    ventaActual = ventaActual.filter(item => item.id !== idProducto);
+    
+    // Si la venta queda vacía, quitamos el descuento automáticamente
+    if (ventaActual.length === 0) {
+        porcentajeDescuento = 0;
+        const inputDescuento = document.getElementById('venta-input-descuento');
+        if (inputDescuento) inputDescuento.value = '';
+    }
+
+    renderVentaPanel(); // Volvemos a dibujar el panel y recalcular totales
+}
+
 function abrirVenta() {
     const backdrop = document.getElementById('venta-backdrop');
     if (backdrop) {
@@ -337,13 +355,15 @@ function renderVentaPanel() {
         ventaActual.forEach(item => {
             const subtotal = item.precio * item.cantidad;
             
-            const p = document.createElement('p');
-            p.innerHTML = `
-                <span style="font-weight:600;">${item.cantidad}x</span> 
-                ${item.nombre} 
-                <span style="float:right;">${formatearPrecio(subtotal).replace(/\u00A0/g, ' ')}</span>
+            const div = document.createElement('div');
+            div.className = 'venta-item-row'; 
+            div.innerHTML = `
+                <span style="font-weight:600; flex-shrink: 0; margin-right: 8px;">${item.cantidad}x</span> 
+                <span style="flex-grow: 1;">${item.nombre}</span>
+                <span style="font-weight: 600; flex-shrink: 0; margin-left: 8px;">${formatearPrecio(subtotal).replace(/\u00A0/g, ' ')}</span>
+                <button class="btn-eliminar-venta-item" data-id="${item.id}" title="Eliminar este ítem">🗑</button>
             `;
-            listaDiv.appendChild(p);
+            listaDiv.appendChild(div);
         });
         btnConfirmar.disabled = false;
     }
@@ -934,7 +954,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // BOTONES DE NAVEGACIÓN (Escuchadores)
   if (btnShowProductos) btnShowProductos.addEventListener('click', () => mostrarPanel('productos'));
-  if (btnShowHistorial) btnShowHistorial.addEventListener('click', () => mostrarPanel('historial')); // Ahora llama a mostrarPanel
+  if (btnShowHistorial) btnShowHistorial.addEventListener('click', () => mostrarPanel('historial'));
 
   // Buscar en vivo (Tabla de productos principal)
   if (inputBuscador) {
@@ -1046,6 +1066,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // NUEVO LISTENER: Escucha clics en la lista de items de venta para eliminar
+  const ventaItemsList = document.getElementById('venta-items-list');
+  if (ventaItemsList) {
+      ventaItemsList.addEventListener('click', (e) => {
+          if (e.target.classList.contains('btn-eliminar-venta-item')) {
+              const id = e.target.dataset.id;
+              if (id) eliminarItemVenta(id);
+          }
+      });
+  }
 
   // LISTENERS DE DESCUENTO
   if (btnAplicarDescuento) btnAplicarDescuento.addEventListener('click', aplicarDescuento);

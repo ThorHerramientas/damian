@@ -294,8 +294,25 @@
     .sugerencia-item:hover {
         background-color: #f0f0f0;
     }
-
   
+  /* NUEVOS ESTILOS VENTA RÁPIDA (para botón de eliminar individual) */
+  .venta-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 3px 0;
+  }
+  .btn-eliminar-venta-item {
+      background: none;
+      border: none;
+      color: var(--rojo); /* Rojo definido en :root */
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 4px; 
+      margin-left: auto; /* Empuja el botón al final de la fila */
+  }
+
   /* MOBILE RESPONSIVE FIXES */
   @media (max-width: 768px) {
       .graficos-container {
@@ -624,7 +641,7 @@ Garantía: 1 año"></textarea>
     projectId: "thorherramientas1",
     storageBucket: "thorherramientas1.firebasestorage.app",
     messagingSenderId: "1027910604929",
-    appId: "1:1027910604929:web:9fb7a59ebba2425da31580",
+    appId: "1:1027910604929:web:9fb7a59ebba24255da31580",
     measurementId: "G-P4WMW6BBJD"
   };
   firebase.initializeApp(firebaseConfig);
