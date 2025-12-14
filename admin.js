@@ -359,6 +359,7 @@ function renderVentaPanel() {
  * 1. Intenta encontrar por código de barras exacto (escáner).
  * 2. Si falla, intenta encontrar por palabra clave en Nombre/Marca.
  * @param {string} input Texto ingresado en el campo.
+ * @returns {Array} Lista de productos encontrados.
  */
 function buscarProductoParaVenta(input) {
     if (!input) return [];
@@ -368,7 +369,6 @@ function buscarProductoParaVenta(input) {
 
     // 1. Búsqueda por CÓDIGO DE BARRAS (Coincidencia exacta)
     const matchByBarcode = productos.find(p => {
-        // Debemos acceder a p.data.codbarra ya que p es {id, data}
         const codigosGuardados = p.data.codbarra ? p.data.codbarra.split(',') : [];
         return codigosGuardados.some(cod => {
             const codbarraGuardadoNormalizado = cod.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
@@ -378,20 +378,20 @@ function buscarProductoParaVenta(input) {
     if (matchByBarcode) return [matchByBarcode]; // Si hay coincidencia exacta de código, devuelve SOLO ESE.
 
     // 2. Búsqueda por PALABRA CLAVE (Nombre/Marca/Descripción)
-    const keywords = inputNormalizado.split(/\s+/).filter(k => k.length > 0);
+    const keywords = inputLower.split(/\s+/).filter(k => k.length > 0);
     
     const matchesByKeyword = productos.filter(p => {
         const d = p.data;
         const searchableText = (d.nombre || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
         const searchableTextLower = searchableText.toLowerCase();
 
-        // Verifica que TODAS las palabras clave estén presentes
+        // Verifica que TODAS las palabras clave estén presentes (AND logic)
         const keywordMatch = keywords.every(keyword => searchableTextLower.includes(keyword));
         
         return keywordMatch;
     });
 
-    return matchesByKeyword; // Devuelve los matches por nombre (puede ser 0 o muchos)
+    return matchesByKeyword; 
 }
 
 
@@ -427,7 +427,7 @@ function agregarProductoEncontrado(productoEnStock) {
 function liveSearchVenta() {
     const inputEl = document.getElementById('venta-input-codbarra');
     const input = inputEl.value;
-
+    
     if (input.length < 2) {
         renderVentaSuggestions([]);
         return;
@@ -436,15 +436,11 @@ function liveSearchVenta() {
     const resultados = buscarProductoParaVenta(input);
     
     // Si la búsqueda devuelve UN resultado por coincidencia exacta de código, agrégalo directamente.
-    // Esto maneja el escáner rápido o si el usuario escribe un código exacto.
-    if (resultados.length === 1 && buscarProductoParaVenta(input).length === 1 && (
-        (resultados[0].data.codbarra && resultados[0].data.codbarra.includes(input)) 
-    )) {
-        
-        // Es una coincidencia exacta de código, agregar y limpiar.
+    // Esta lógica se mantiene para el escáner (disparo en 'input')
+    if (resultados.length === 1 && resultados[0].data.codbarra && resultados[0].data.codbarra.includes(input)) {
          agregarProductoEncontrado(resultados[0]);
-         inputEl.value = '';
-         renderVentaSuggestions([]);
+         inputEl.value = ''; // Limpia inmediatamente
+         renderVentaSuggestions([]); // Oculta
          return;
     }
     
@@ -571,6 +567,7 @@ async function confirmarVenta() {
 
 // ---------------------- FUNCIONALIDAD HISTORIAL DE VENTAS Y GRÁFICOS ----------------------
 
+// CRÍTICO: Se ha agregado manejo de errores para datos faltantes en ventas
 function procesarDatosParaGraficos(ventas) {
     // Calcula las fechas para los últimos 7 días (0 = hoy, 6 = hace 6 días)
     const fechas = [];
@@ -581,8 +578,8 @@ function procesarDatosParaGraficos(ventas) {
         fechas.push(d.toISOString().split('T')[0]);
     }
     
-    const datosDiarios = {}; // Agrupados por fechaString (YYYY-MM-DD)
-    const datosProductos = {}; // { nombreProducto: cantidadTotalVendida }
+    const datosDiarios = {}; 
+    const datosProductos = {}; 
 
     // Inicializar datos para los 7 días
     fechas.forEach(fecha => {
@@ -590,38 +587,40 @@ function procesarDatosParaGraficos(ventas) {
     });
 
     ventas.forEach(venta => {
+        // Validación crucial de datos básicos
+        if (!venta.fechaString) return; 
+
         const fecha = venta.fechaString;
         
         // 1. Datos Diarios (Ganancia y Transacciones)
         if (datosDiarios[fecha]) {
             datosDiarios[fecha].ganancia += venta.totalFinal || 0;
             datosDiarios[fecha].transacciones += 1;
-            datosDiarios[fecha].ventas.push(venta); // Almacenar la venta completa para el detalle
+            datosDiarios[fecha].ventas.push(venta); 
         } else {
-             // Esto puede ocurrir si hay ventas guardadas que caen justo en el límite de los 7 días.
+            // Si la fecha es fuera del rango de 7 días (aunque la consulta lo debería evitar)
             return;
         }
 
         // 2. Datos Productos
-        venta.items.forEach(item => {
-            const nombre = item.nombre;
-            const cantidad = item.cantidad || 0;
-            datosProductos[nombre] = (datosProductos[nombre] || 0) + cantidad;
-        });
+        if (venta.items && Array.isArray(venta.items)) {
+            venta.items.forEach(item => {
+                // Validación de ítems
+                if (!item.nombre || item.cantidad === undefined) return;
+
+                const nombre = item.nombre;
+                const cantidad = item.cantidad || 0;
+                datosProductos[nombre] = (datosProductos[nombre] || 0) + cantidad;
+            });
+        }
     });
 
     // --- Preparación de datos para Chart.js ---
     
-    // 1. Etiquetas de fecha (ej: Lun 18)
     const etiquetasFecha = fechas.map(f => new Date(f + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' }));
-
-    // 2. Gráfico de Ganancia Diaria (Ganancia en Pesos)
     const valoresGanancia = fechas.map(f => datosDiarios[f].ganancia);
-    
-    // 3. Gráfico de Transacciones Diarias (Número de Transacciones)
     const valoresTransacciones = fechas.map(f => datosDiarios[f].transacciones);
     
-    // 4. Gráfico de Productos Vendidos (Top 5)
     const topProductos = Object.entries(datosProductos)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 5);
@@ -630,9 +629,7 @@ function procesarDatosParaGraficos(ventas) {
     const valoresProductos = topProductos.map(([, cantidad]) => cantidad);
     
     return {
-        // Devolvemos el objeto completo para renderizar el detalle por día
         ventasPorDia: datosDiarios, 
-        // Datos para los 3 gráficos
         ganancia: { labels: etiquetasFecha, data: valoresGanancia },
         productos: { labels: etiquetasProductos, data: valoresProductos },
         transacciones: { labels: etiquetasFecha, data: valoresTransacciones }
@@ -640,85 +637,112 @@ function procesarDatosParaGraficos(ventas) {
 }
 
 function dibujarGraficos(datos) {
-    // Destruye instancias antiguas si existen
+    // 1. Destruye instancias antiguas si existen
     if (myChartGanancia) myChartGanancia.destroy();
     if (myChartProductos) myChartProductos.destroy();
     if (myChartTransacciones) myChartTransacciones.destroy();
+    
+    // Función de formato para tooltips (reemplaza espacio duro por espacio normal)
+    const formatPriceTooltip = (value) => formatearPrecio(value).replace(/\u00A0/g, ' ');
 
-    // 1. GRÁFICO DE GANANCIA DIARIA (Ganancia en Pesos)
-    const ctxGanancia = document.getElementById('grafico-ganancia-diaria').getContext('2d');
-    myChartGanancia = new Chart(ctxGanancia, {
-        type: 'bar',
-        data: {
-            labels: datos.ganancia.labels,
-            datasets: [{
-                label: 'Ganancia Final (ARS)',
-                data: datos.ganancia.data,
-                backgroundColor: 'rgba(0, 166, 80, 0.7)', // Verde
-                borderColor: 'rgba(0, 166, 80, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'Monto (ARS)' } }
+    // --- 1. GRÁFICO DE GANANCIA DIARIA (Ganancia en Pesos) ---
+    const canvasGanancia = document.getElementById('grafico-ganancia-diaria');
+    if (canvasGanancia) {
+        const ctxGanancia = canvasGanancia.getContext('2d');
+        myChartGanancia = new Chart(ctxGanancia, {
+            type: 'bar',
+            data: {
+                labels: datos.ganancia.labels,
+                datasets: [{
+                    label: 'Ganancia Final (ARS)',
+                    data: datos.ganancia.data,
+                    backgroundColor: 'rgba(0, 166, 80, 0.7)', // Verde
+                    borderColor: 'rgba(0, 166, 80, 1)',
+                    borderWidth: 1
+                }]
             },
-            plugins: {
-                legend: { display: false },
-                tooltip: { callbacks: { label: (context) => `ARS ${formatearPrecio(context.parsed.y).replace(/\u00A0/g, ' ').replace('$', '')}` } }
+            options: {
+                responsive: true,
+                maintainAspectRatio: true, // Asegura que se adapte al contenedor
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        title: { display: true, text: 'Monto (ARS)' },
+                        ticks: {
+                            callback: function(value) {
+                                return formatPriceTooltip(value);
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { 
+                        callbacks: { 
+                            label: (context) => `ARS ${formatPriceTooltip(context.parsed.y).replace('$', '')}` 
+                        } 
+                    }
+                }
             }
-        }
-    });
+        });
+    }
 
-    // 2. GRÁFICO DE PRODUCTOS VENDIDOS (Top 5)
-    const ctxProductos = document.getElementById('grafico-productos-vendidos').getContext('2d');
-    myChartProductos = new Chart(ctxProductos, {
-        type: 'doughnut',
-        data: {
-            labels: datos.productos.labels,
-            datasets: [{
-                label: 'Cantidad Vendida',
-                data: datos.productos.data,
-                backgroundColor: ['#1976d2', '#ffd600', '#c62828', '#2e7d32', '#9c27b0'], // Colores corporativos y otros
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                title: { display: false },
-                legend: { position: 'bottom' }
-            }
-        }
-    });
-
-    // 3. GRÁFICO DE TRANSACCIONES DIARIAS (Transacciones)
-    const ctxTransacciones = document.getElementById('grafico-transacciones-diarias').getContext('2d');
-    myChartTransacciones = new Chart(ctxTransacciones, {
-        type: 'line',
-        data: {
-            labels: datos.transacciones.labels,
-            datasets: [{
-                label: 'Transacciones',
-                data: datos.transacciones.data,
-                backgroundColor: 'rgba(25, 118, 210, 0.2)', // Azul claro
-                borderColor: 'rgba(25, 118, 210, 1)',
-                borderWidth: 2,
-                tension: 0.4,
-                fill: true,
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'Número de Ventas' }, ticks: { precision: 0 } }
+    // --- 2. GRÁFICO DE PRODUCTOS VENDIDOS (Top 5) ---
+    const canvasProductos = document.getElementById('grafico-productos-vendidos');
+    if (canvasProductos) {
+        const ctxProductos = canvasProductos.getContext('2d');
+        myChartProductos = new Chart(ctxProductos, {
+            type: 'doughnut',
+            data: {
+                labels: datos.productos.labels,
+                datasets: [{
+                    label: 'Cantidad Vendida',
+                    data: datos.productos.data,
+                    backgroundColor: ['#1976d2', '#ffd600', '#c62828', '#2e7d32', '#9c27b0'], // Colores corporativos y otros
+                    hoverOffset: 4
+                }]
             },
-            plugins: {
-                legend: { display: false }
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    title: { display: false },
+                    legend: { position: 'bottom' }
+                }
             }
-        }
-    });
+        });
+    }
+
+    // --- 3. GRÁFICO DE TRANSACCIONES DIARIAS (Transacciones) ---
+    const canvasTransacciones = document.getElementById('grafico-transacciones-diarias');
+    if (canvasTransacciones) {
+        const ctxTransacciones = canvasTransacciones.getContext('2d');
+        myChartTransacciones = new Chart(ctxTransacciones, {
+            type: 'line',
+            data: {
+                labels: datos.transacciones.labels,
+                datasets: [{
+                    label: 'Transacciones',
+                    data: datos.transacciones.data,
+                    backgroundColor: 'rgba(25, 118, 210, 0.2)', // Azul claro
+                    borderColor: 'rgba(25, 118, 210, 1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Número de Ventas' }, ticks: { precision: 0 } }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
 }
 
 
@@ -741,16 +765,14 @@ async function cargarHistorialVentas() {
         // --- FIN CÁLCULO DE RANGO DE FECHAS ---
 
         // 1. Consultar ventas: solo las que ocurrieron a partir del inicio de "hace 7 días"
-        // NOTA: Se ha quitado el orderBy('fecha', 'desc') para evitar el error de índice
-        // y se ordenarán los datos en el cliente.
+        // Requiere un índice de Firestore en el campo 'fecha'
         const snapshot = await db.collection(COLECCION_VENTAS)
             .where('fecha', '>=', timestampLimite)
             .get(); 
         
-        const ventas = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
+        const ventas = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(venta => venta.fechaString); // Solo procesar si tiene fechaString
         
         // Ordenamos en el cliente para asegurar el orden cronológico
         ventas.sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
@@ -765,8 +787,8 @@ async function cargarHistorialVentas() {
         renderHistorialVentas(datosProcesados.ventasPorDia);
 
     } catch (e) {
-        console.error("Error cargando historial de ventas:", e);
-        listaCont.innerHTML = '<p style="color:var(--rojo);">Error al cargar el historial de ventas. (Ver consola F12 para detalles)</p>';
+        console.error("Error cargando historial de ventas. Probablemente falte un índice de Firestore.", e);
+        listaCont.innerHTML = '<p style="color:var(--rojo);">Error al cargar o procesar el historial de ventas. Por favor, revisa la consola (F12) para ver si falta un **Índice de Firestore** en la colección `ventas` para el campo `fecha`.</p>';
     } finally {
         loader.style.display = 'none';
     }
@@ -784,10 +806,9 @@ function renderHistorialVentas(ventasPorDia) {
 
     fechasOrdenadas.forEach(fecha => {
         const dataDia = ventasPorDia[fecha];
-        // Los datos ya vienen agrupados y contienen la lista de ventas dentro de 'dataDia.ventas'
         
-        // Filtramos para asegurar que solo se muestren los días que tienen ventas guardadas
-        if (dataDia.ventas && dataDia.ventas.length === 0) return;
+        // Validación adicional antes de renderizar
+        if (!dataDia || !dataDia.ventas || dataDia.ventas.length === 0) return;
         
         const fechaLegible = new Date(fecha + 'T00:00:00').toLocaleDateString('es-AR', { dateStyle: 'full' });
 
@@ -804,12 +825,12 @@ function renderHistorialVentas(ventasPorDia) {
                     <div class="historial-item">
                         <div class="item-detalle">
                             <span style="font-weight:700;">#${dataDia.ventas.length - index} |</span>
-                            <span style="color:#777;">Final: ${formatearPrecio(venta.totalFinal).replace(/\u00A0/g, ' ')}</span>
-                            ${venta.montoDescuento > 0 ? `<span style="color:var(--rojo); font-weight:600;">(Dto: ${venta.porcentajeDescuento}%)</span>` : ''}
+                            <span style="color:#777;">Final: ${formatearPrecio(venta.totalFinal || 0).replace(/\u00A0/g, ' ')}</span>
+                            ${(venta.montoDescuento || 0) > 0 ? `<span style="color:var(--rojo); font-weight:600;">(Dto: ${venta.porcentajeDescuento || 0}%)</span>` : ''}
                         </div>
                         <div style="text-align:right;">
-                            ${venta.items.map(item => `
-                                <div style="font-weight:400;">${item.cantidad}x ${item.nombre}</div>
+                            ${(venta.items || []).map(item => `
+                                <div style="font-weight:400;">${item.cantidad || 0}x ${item.nombre || 'Producto Desconocido'}</div>
                             `).join('')}
                         </div>
                     </div>
@@ -913,7 +934,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // BOTONES DE NAVEGACIÓN (Escuchadores)
   if (btnShowProductos) btnShowProductos.addEventListener('click', () => mostrarPanel('productos'));
-  if (btnShowHistorial) btnShowHistorial.addEventListener('click', () => cargarHistorialVentas());
+  if (btnShowHistorial) btnShowHistorial.addEventListener('click', () => mostrarPanel('historial')); // Ahora llama a mostrarPanel
 
   // Buscar en vivo (Tabla de productos principal)
   if (inputBuscador) {
@@ -996,10 +1017,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // LISTENER DE AUTOSUGERENCIAS
   if (inputCodBarraVenta) {
-    // Al escribir, buscar y mostrar sugerencias
+    // 1. Manejo del input (escribir) - Muestra sugerencias en tiempo real
     inputCodBarraVenta.addEventListener('input', liveSearchVenta);
     
-    // Si el usuario presiona ENTER, intenta agregar el producto
+    // 2. Manejo de Enter (Escáner o búsqueda manual final)
     inputCodBarraVenta.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -1018,7 +1039,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
     
-    // Al perder el foco (si no es porque seleccionó algo), ocultar la lista
+    // 3. Ocultar sugerencias al perder el foco (con retraso para permitir el clic)
     inputCodBarraVenta.addEventListener('blur', () => {
          // Se añade un pequeño retraso para permitir que el evento 'click' en la sugerencia se dispare primero.
          setTimeout(() => renderVentaSuggestions([]), 200);
