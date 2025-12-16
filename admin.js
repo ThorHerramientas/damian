@@ -195,7 +195,7 @@ async function actualizarStockRapidoPorInput(idProducto, nuevoValor) {
 
     let nuevoStock = Number(nuevoValor);
     if (isNaN(nuevoStock) || nuevoStock < 0) {
-        alert("Valor de stock inválido. Debe ser un número positivo.");
+        mostrarAlertaStock("Valor de stock inválido. Debe ser un número positivo.");
         // Restablecer el valor en la UI
         const inputEl = document.getElementById(`stock-input-${idProducto}`);
         if(inputEl) inputEl.value = prodEntry.data.stock ?? 0;
@@ -219,7 +219,7 @@ async function actualizarStockRapidoPorInput(idProducto, nuevoValor) {
         
     } catch (err) {
         console.error("Error actualizando stock por input:", err);
-        alert("Hubo un error al actualizar el stock.");
+        mostrarAlertaStock("Hubo un error al actualizar el stock.");
     }
 }
 
@@ -232,7 +232,7 @@ async function actualizarStockRapido(idProducto, delta) {
     const nuevoStock = stockActual + delta;
 
     if (nuevoStock < 0) {
-        alert(`El stock no puede ser negativo para ${prodEntry.data.nombre}. Stock actual: ${stockActual}`);
+        mostrarAlertaStock(`El stock no puede ser negativo para ${prodEntry.data.nombre}. Stock actual: ${stockActual}`);
         return;
     }
 
@@ -250,13 +250,56 @@ async function actualizarStockRapido(idProducto, delta) {
         
     } catch (err) {
         console.error("Error actualizando stock:", err);
-        alert("Hubo un error al actualizar el stock.");
+        mostrarAlertaStock("Hubo un error al actualizar el stock.");
     }
 }
 // ---------------------------------------------------------------------------
 
 
 // ---------------------- FUNCIONALIDAD VENTA RÁPIDA (POS) - FUNCIONES GLOBALES ----------------------
+
+// FUNCIÓN CLAVE: Reemplaza el alert() nativo
+function mostrarAlertaStock(mensaje) {
+    const alertaDiv = document.getElementById('venta-alerta-stock');
+    const mensajeSpan = document.getElementById('venta-alerta-mensaje');
+    const inputCodBarraVenta = document.getElementById('venta-input-codbarra');
+    
+    if (!alertaDiv || !mensajeSpan) {
+        // Fallback si el modal no existe (aunque no debería)
+        alert(mensaje);
+        return;
+    }
+
+    mensajeSpan.textContent = mensaje;
+    alertaDiv.classList.remove('oculto');
+    alertaDiv.style.display = 'flex';
+    
+    // Aseguramos que al cerrar el modal, el foco regrese al input del escáner
+    const cerrarAlerta = () => {
+        alertaDiv.classList.add('oculto');
+        alertaDiv.style.display = 'none';
+        if (inputCodBarraVenta) inputCodBarraVenta.focus();
+    };
+
+    // Listener para cerrar al hacer clic en el botón
+    const btnCerrar = document.getElementById('btn-cerrar-alerta-stock');
+    if (btnCerrar) {
+        // Clonamos el nodo para remover listeners antiguos y evitar cierres múltiples
+        const newBtnCerrar = btnCerrar.cloneNode(true);
+        btnCerrar.parentNode.replaceChild(newBtnCerrar, btnCerrar);
+        newBtnCerrar.addEventListener('click', cerrarAlerta);
+    }
+    
+    // Listener para cerrar al presionar Enter o Escape
+    const handleKey = (e) => {
+        if (e.key === 'Enter' || e.key === 'Escape') {
+            cerrarAlerta();
+            document.removeEventListener('keydown', handleKey);
+        }
+    };
+    document.addEventListener('keydown', handleKey);
+}
+
 
 function vaciarVenta() {
     ventaActual = [];
@@ -315,7 +358,7 @@ function aplicarDescuento() {
     
     // Validaciones
     if (porcentaje < 0 || porcentaje > 100) {
-        alert("El descuento debe ser un porcentaje entre 0 y 100.");
+        mostrarAlertaStock("El descuento debe ser un porcentaje entre 0 y 100.");
         porcentaje = Math.min(100, Math.max(0, porcentaje)); // Limita entre 0 y 100
         inputDescuento.value = porcentaje;
     }
@@ -425,7 +468,8 @@ function agregarProductoEncontrado(productoEnStock) {
     const cantidadActualVenta = itemEnVenta ? itemEnVenta.cantidad : 0;
 
     if (stockDisponible <= cantidadActualVenta) {
-        alert(`Stock agotado o insuficiente de "${productoEnStock.data.nombre}". Stock disponible: ${stockDisponible}.`);
+        // USAMOS LA NUEVA FUNCIÓN PARA MANTENER LA ALERTA EN PANTALLA
+        mostrarAlertaStock(`Stock agotado o insuficiente de "${productoEnStock.data.nombre}". Stock disponible: ${stockDisponible}.`);
         return;
     }
 
@@ -570,6 +614,8 @@ async function confirmarVenta() {
         // --- FIN LÓGICA PARA GUARDAR LA VENTA ---
 
 
+        // Reemplazamos alert() por el modal si es necesario, aunque en este punto alert() es aceptable
+        // ya que la confirmación de venta es una acción final y menos frecuente.
         alert(`Venta por ${formatearPrecio(totalFinalVenta).replace(/\u00A0/g, ' ')} (Dto: ${porcentajeDescuento}%) confirmada y stock actualizado!`);
         
         vaciarVenta();
@@ -579,6 +625,7 @@ async function confirmarVenta() {
 
     } catch (error) {
         console.error("Error en la transacción de venta:", error);
+        // Usamos alert() nativo aquí ya que el error de transacción es crítico
         alert(`Error al confirmar la venta: ${error.message}`);
     }
 }
@@ -1046,16 +1093,39 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             const codbarra = inputCodBarraVenta.value.trim();
             
+            // Si el campo está vacío, ignoramos la pulsación de Enter.
+            if (!codbarra) return; 
+
+            // Buscamos resultados utilizando la función que prioriza CÓDIGO EXACTO.
             const resultados = buscarProductoParaVenta(codbarra);
             
-            // Si hay una única coincidencia (ya sea por código exacto o nombre exacto)
             if (resultados.length === 1) {
-                agregarProductoEncontrado(resultados[0]);
-                inputCodBarraVenta.value = '';
-                renderVentaSuggestions([]);
-            } else {
-                 alert("Por favor, seleccione un producto de la lista o refine su búsqueda.");
+                // Caso ideal: Coincidencia única y exacta (escaneo exitoso)
+                agregarProductoEncontrado(resultados[0]); 
+                
+                // Retrasamos la limpieza para asegurar que todos los eventos se completen 
+                // (incluida la alerta de stock, si se dispara dentro de agregarProductoEncontrado).
+                setTimeout(() => {
+                    inputCodBarraVenta.value = ''; 
+                    renderVentaSuggestions([]);
+                    // Mantenemos el foco en el input del escáner (si no está en el modal de alerta)
+                    inputCodBarraVenta.focus(); 
+                }, 50); 
+                
+                return;
+            } 
+            
+            if (resultados.length > 1) {
+                // Caso: Coincidencia múltiple (por nombre parcial).
+                mostrarAlertaStock("Se encontraron múltiples coincidencias. Por favor, seleccione un producto de la lista.");
+                return;
             }
+            
+            // Si resultados.length === 0 (No encontró): Limpia el input y resetea sugerencias.
+            inputCodBarraVenta.value = '';
+            renderVentaSuggestions([]);
+            return;
+            
         }
     });
     
