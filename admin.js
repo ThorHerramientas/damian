@@ -558,33 +558,42 @@ async function confirmarVenta() {
 
     try {
         const updates = await db.runTransaction(async (transaction) => {
-            const updatesList = [];
+            const resultList = [];
             
-            for (const item of ventaActual) {
+            // 1. PRIMERO: Realizar TODAS las lecturas
+            const readPromises = ventaActual.map(item => {
                 const docRef = productosRef.doc(item.id);
-                const doc = await transaction.get(docRef);
+                return transaction.get(docRef);
+            });
+            
+            const docs = await Promise.all(readPromises);
+
+            // 2. SEGUNDO: Validar stock y realizar TODAS las escrituras
+            for (let i = 0; i < ventaActual.length; i++) {
+                const item = ventaActual[i];
+                const doc = docs[i];
 
                 if (!doc.exists) {
-                    throw new Error(`Producto ${item.nombre} no existe en la base de datos.`);
+                    throw new Error(`El producto "${item.nombre}" no existe en la base de datos.`);
                 }
                 
                 const data = doc.data();
                 const stockActual = Number(data.stock) || 0;
-                const cantidadVendida = item.cantidad;
-                const nuevoStock = stockActual - cantidadVendida;
+                const nuevoStock = stockActual - item.cantidad;
 
                 if (nuevoStock < 0) {
-                    throw new Error(`Stock insuficiente para "${item.nombre}". Stock: ${stockActual}, Venta: ${cantidadVendida}.`);
+                    throw new Error(`Stock insuficiente para "${item.nombre}". Disponible: ${stockActual}, solicitado: ${item.cantidad}.`);
                 }
 
-                transaction.update(docRef, { stock: nuevoStock });
-
-                updatesList.push({ id: item.id, nuevoStock: nuevoStock });
+                // Aplicar la actualización
+                transaction.update(doc.ref, { stock: nuevoStock });
+                resultList.push({ id: item.id, nuevoStock: nuevoStock });
             }
 
-            return updatesList;
+            return resultList;
         });
 
+        // Actualización exitosa en base de datos, ahora actualizamos la interfaz local
         updates.forEach(update => {
             const prodEntry = productos.find(p => p.id === update.id);
             if (prodEntry) prodEntry.data.stock = update.nuevoStock;
@@ -594,10 +603,10 @@ async function confirmarVenta() {
         const montoDescuento = totalSinDto * (porcentajeDescuento / 100);
         const totalFinalVenta = totalSinDto - montoDescuento;
 
-        // --- LÓGICA PARA GUARDAR LA VENTA ---
+        // Registrar la venta en el historial
         const ventaData = {
-            fecha: firebase.firestore.FieldValue.serverTimestamp(), // Firestore timestamp
-            fechaString: new Date().toISOString().split('T')[0], // YYYY-MM-DD for easier grouping/querying
+            fecha: firebase.firestore.FieldValue.serverTimestamp(),
+            fechaString: new Date().toISOString().split('T')[0],
             totalSinDescuento: totalSinDto,
             montoDescuento: montoDescuento,
             porcentajeDescuento: porcentajeDescuento,
@@ -611,12 +620,8 @@ async function confirmarVenta() {
         };
         
         await db.collection(COLECCION_VENTAS).add(ventaData);
-        // --- FIN LÓGICA PARA GUARDAR LA VENTA ---
 
-
-        // Reemplazamos alert() por el modal si es necesario, aunque en este punto alert() es aceptable
-        // ya que la confirmación de venta es una acción final y menos frecuente.
-        alert(`Venta por ${formatearPrecio(totalFinalVenta).replace(/\u00A0/g, ' ')} (Dto: ${porcentajeDescuento}%) confirmada y stock actualizado!`);
+        alert(`Venta confirmada exitosamente.`);
         
         vaciarVenta();
         renderTablaProductos();
@@ -624,8 +629,7 @@ async function confirmarVenta() {
         cerrarVenta(); 
 
     } catch (error) {
-        console.error("Error en la transacción de venta:", error);
-        // Usamos alert() nativo aquí ya que el error de transacción es crítico
+        console.error("Error en la transacción:", error);
         alert(`Error al confirmar la venta: ${error.message}`);
     }
 }
