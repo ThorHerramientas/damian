@@ -170,6 +170,7 @@ function renderEstadisticas() {
 
 function renderTablaProductos() {
   const tbody = document.getElementById("tabla-productos-body");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   const lista = productosFiltrados();
@@ -355,43 +356,7 @@ async function actualizarStockRapido(idProducto, delta) {
     }
 }
 
-// ---------------------- FUNCIONALIDAD VETA RÁPIDA (POS) ----------------------
-
-function mostrarAlertaStock(mensaje) {
-    const alertaDiv = document.getElementById('venta-alerta-stock');
-    const mensajeSpan = document.getElementById('venta-alerta-mensaje');
-    const inputCodBarraVenta = document.getElementById('venta-input-codbarra');
-    
-    if (!alertaDiv || !mensajeSpan) {
-        alert(mensaje);
-        return;
-    }
-
-    mensajeSpan.textContent = mensaje;
-    alertaDiv.classList.remove('oculto');
-    alertaDiv.style.display = 'flex';
-    
-    const cerrarAlerta = () => {
-        alertaDiv.classList.add('oculto');
-        alertaDiv.style.display = 'none';
-        if (inputCodBarraVenta) inputCodBarraVenta.focus();
-    };
-
-    const btnCerrar = document.getElementById('btn-cerrar-alerta-stock');
-    if (btnCerrar) {
-        const newBtnCerrar = btnCerrar.cloneNode(true);
-        btnCerrar.parentNode.replaceChild(newBtnCerrar, btnCerrar);
-        newBtnCerrar.addEventListener('click', cerrarAlerta);
-    }
-    
-    const handleKey = (e) => {
-        if (e.key === 'Enter' || e.key === 'Escape') {
-            cerrarAlerta();
-            document.removeEventListener('keydown', handleKey);
-        }
-    };
-    document.addEventListener('keydown', handleKey);
-}
+// ---------------------- FUNCIONALIDAD VENTA RÁPIDA (POS) ----------------------
 
 function vaciarVenta() {
     ventaActual = [];
@@ -424,7 +389,8 @@ function abrirVenta() {
         backdrop.classList.remove('oculto');
     }
     vaciarVenta(); 
-    document.getElementById('venta-input-codbarra').focus();
+    const inputScanner = document.getElementById('venta-input-codbarra');
+    if (inputScanner) inputScanner.focus();
 }
 
 function cerrarVenta() {
@@ -444,7 +410,6 @@ function aplicarDescuento() {
 
     let porcentaje = Number(inputDescuento.value) || 0;
     
-    // FIX DE VARIABLE EN INGLÉS SOLUCIONADO AQUÍ:
     if (porcentaje < 0 || porcentaje > 100) {
         mostrarAlertaStock("El descuento debe ser un porcentaje entre 0 y 100.");
         porcentaje = Math.min(100, Math.max(0, porcentaje)); 
@@ -473,7 +438,7 @@ function renderVentaPanel() {
     const montoDescuento = totalSinDescuento * (porcentajeDescuento / 100);
     const totalFinal = Math.max(0, totalSinDescuento - montoDescuento); 
 
-    if (!listaDiv) return; // Validación preventiva de renderizado
+    if (!listaDiv) return; 
     listaDiv.innerHTML = '';
 
     if (ventaActual.length === 0) {
@@ -558,6 +523,7 @@ function agregarProductoEncontrado(productoEnStock) {
 
 function liveSearchVenta() {
     const inputEl = document.getElementById('venta-input-codbarra');
+    if (!inputEl) return;
     const input = inputEl.value;
     
     if (input.length < 2) {
@@ -855,6 +821,7 @@ function dibujarGraficos(datos) {
 async function cargarHistorialVentas() {
     const listaCont = document.getElementById('historial-ventas-list');
     const loader = document.getElementById('historial-loader');
+    if (!listaCont || !loader) return;
     
     listaCont.innerHTML = '';
     loader.style.display = 'block';
@@ -890,6 +857,7 @@ async function cargarHistorialVentas() {
 
 function renderHistorialVentas(ventasPorDia) {
     const listaCont = document.getElementById('historial-ventas-list');
+    if (!listaCont) return;
     const fechasOrdenadas = Object.keys(ventasPorDia).sort((a, b) => b.localeCompare(a)); 
 
     if (fechasOrdenadas.length === 0) {
@@ -1003,6 +971,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const cardFiltroAgotados = document.getElementById('btn-filtro-agotados');
   const alertaFiltro = document.getElementById('alerta-filtro-activo');
   const btnQuitarAlertaFiltro = document.getElementById('btn-quitar-filtro-agotados');
+  const ventaItemsList = document.getElementById('venta-items-list');
 
   cargarProductosDesdeFirestore().catch(err => {
     console.error("Error cargando productos:", err);
@@ -1021,11 +990,11 @@ document.addEventListener("DOMContentLoaded", () => {
       soloAgotados = !soloAgotados;
       
       if (soloAgotados) {
-          cardFiltroAgotados.classList.add('activo-filtro');
-          alertaFiltro.classList.remove('oculto');
+          if (cardFiltroAgotados) cardFiltroAgotados.classList.add('activo-filtro');
+          if (alertaFiltro) alertaFiltro.classList.remove('oculto');
       } else {
-          cardFiltroAgotados.classList.remove('activo-filtro');
-          alertaFiltro.classList.add('oculto');
+          if (cardFiltroAgotados) cardFiltroAgotados.classList.remove('activo-filtro');
+          if (alertaFiltro) alertaFiltro.classList.add('oculto');
       }
       renderTablaProductos();
   };
@@ -1040,52 +1009,54 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault(); 
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault(); 
 
-    const id = document.getElementById("prod-id").value.trim();
-    const nombre = document.getElementById("prod-nombre").value.trim();
-    const sku = document.getElementById("prod-sku").value.trim(); 
-    const marca = document.getElementById("prod-marca").value.trim();
-    const costo = Number(document.getElementById("prod-costo").value || 0); 
-    const precio = Number(document.getElementById("prod-precio").value || 0);
-    const stock = Number(document.getElementById("prod-stock").value || 0);
-    const alimentacion = document.getElementById("prod-alimentacion").value;
-    const codbarra = document.getElementById("prod-codbarra").value.trim(); 
-    const imagenTexto = document.getElementById("prod-imagen").value.trim();
-    const description = document.getElementById("prod-descripcion").value.trim();
-    const enviosText = document.getElementById("prod-envios").value;
-    const detallesText = document.getElementById("prod-detalles").value;
+      const id = document.getElementById("prod-id").value.trim();
+      const nombre = document.getElementById("prod-nombre").value.trim();
+      const sku = document.getElementById("prod-sku").value.trim(); 
+      const marca = document.getElementById("prod-marca").value.trim();
+      const costo = Number(document.getElementById("prod-costo").value || 0); 
+      const precio = Number(document.getElementById("prod-precio").value || 0);
+      const stock = Number(document.getElementById("prod-stock").value || 0);
+      const alimentacion = document.getElementById("prod-alimentacion").value;
+      const codbarra = document.getElementById("prod-codbarra").value.trim(); 
+      const imagenTexto = document.getElementById("prod-imagen").value.trim();
+      const description = document.getElementById("prod-descripcion").value.trim();
+      const enviosText = document.getElementById("prod-envios").value;
+      const detallesText = document.getElementById("prod-detalles").value;
 
-    if (!nombre) {
-      alert("El nombre es obligatorio.");
-      return;
-    }
-
-    const opcionesEnvio = enviosText.split(",").map(t => t.trim()).filter(Boolean);
-    const detalles = detallesText.split("\n").map(t => t.trim()).filter(Boolean);
-
-    const images = imagenTexto ? imagenTexto.split(",").map(u => u.trim()).filter(Boolean) : [];
-    const imagenPlaceholder = "https://via.placeholder.com/300x200?text=Producto";
-    const imagenPrincipal = images.length > 0 ? images[0] : imagenPlaceholder;
-
-    const producto = { nombre, sku, marca, costo, precio, stock, alimentacion, codbarra, imagen: imagenPrincipal, imagenes: images, descripcion: description, opcionesEnvio, detalles };
-
-    try {
-      if (id) {
-        await productosRef.doc(id).update(producto);
-        alert("Producto actualizado correctamente.");
-      } else {
-        await productosRef.add(producto);
-        alert("Producto creado correctamente.");
+      if (!nombre) {
+        alert("El nombre es obligatorio.");
+        return;
       }
-      toggleFormularioProducto(false);
-      await cargarProductosDesdeFirestore(); 
-    } catch (err) {
-      console.error("Error guardando producto:", err);
-      alert("Hubo un error guardando el producto.");
-    }
-  });
+
+      const opcionesEnvio = enviosText.split(",").map(t => t.trim()).filter(Boolean);
+      const detalles = detallesText.split("\n").map(t => t.trim()).filter(Boolean);
+
+      const images = imagenTexto ? imagenTexto.split(",").map(u => u.trim()).filter(Boolean) : [];
+      const imagenPlaceholder = "https://via.placeholder.com/300x200?text=Producto";
+      const imagenPrincipal = images.length > 0 ? images[0] : imagenPlaceholder;
+
+      const producto = { nombre, sku, marca, costo, precio, stock, alimentacion, codbarra, imagen: imagenPrincipal, imagenes: images, descripcion: description, opcionesEnvio, detalles };
+
+      try {
+        if (id) {
+          await productosRef.doc(id).update(producto);
+          alert("Producto actualizado correctamente.");
+        } else {
+          await productosRef.add(producto);
+          alert("Producto creado correctamente.");
+        }
+        toggleFormularioProducto(false);
+        await cargarProductosDesdeFirestore(); 
+      } catch (err) {
+        console.error("Error guardando producto:", err);
+        alert("Hubo un error guardando el producto.");
+      }
+    });
+  }
 
   tbody.addEventListener("change", async (e) => {
     if (e.target.classList.contains("costo-input-edit")) {
@@ -1143,7 +1114,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   
-  // FIX CRÍTICO: Los listeners individuales del POS ahora apuntan a las funciones unificadas
+  if (btnRealizarVenta) btnRealizarVenta.addEventListener('click', abrirVenta);
+  if (btnVaciarVenta) btnVaciarVenta.addEventListener('click', vaciarVenta);
+  if (btnConfirmarVenta) btnConfirmarVenta.addEventListener('click', confirmarVenta);
+
   if (btnApplyDiscount) btnApplyDiscount.addEventListener('click', aplicarDescuento);
   if (btnQuitarDescuento) btnQuitarDescuento.addEventListener('click', quitarDescuento);
   
@@ -1198,5 +1172,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  document.getElementById("btn-limpiar-form").addEventListener("click", () => limpiarFormulario());
+  const btnLimpiar = document.getElementById("btn-limpiar-form");
+  if (btnLimpiar) btnLimpiar.addEventListener("click", () => limpiarFormulario());
 });
