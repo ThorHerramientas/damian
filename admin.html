@@ -62,7 +62,7 @@
     .btn-secundario:hover { filter: brightness(0.95); }
 
     main.admin-container {
-      max-width: 1000px;
+      max-width: 1200px; /* Incrementado para que use mejor el ancho de la compu */
       margin: 16px auto;
       background-color: #fff;
       padding: 16px;
@@ -138,20 +138,41 @@
     }
 
     .tabla-wrapper { width: 100%; overflow-x: auto; }
+    
     table.admin-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 13px;
       margin-top: 8px;
-      min-width: 780px; /* Incrementado para dar espacio a la nueva columna */
     }
     .admin-table thead { background-color: #f5f5f5; }
+    
     .admin-table th, .admin-table td {
       border: 1px solid var(--borde);
-      padding: 6px 8px;
+      padding: 8px 10px;
       text-align: left;
       box-sizing: border-box;
+      /* Por defecto las celdas numéricas y códigos no se cortan */
+      white-space: nowrap; 
     }
+
+    /* FIX CRÍTICO: Estilos específicos para la columna Nombre para evitar desbordes */
+    .col-nombre {
+      white-space: normal !important; /* Permitimos saltos de línea */
+      word-break: break-word;        /* Rompe palabras si es necesario */
+      max-width: 250px;              /* Evita que se estire de más en compu */
+      min-width: 180px;
+    }
+
+    /* Seteamos anchos fijos a las columnas numéricas para que queden alineadas */
+    .col-sku { min-width: 90px; }
+    .col-marca { min-width: 90px; white-space: normal !important; max-width: 120px; }
+    .col-precio { min-width: 105px; }
+    .col-ganancia { min-width: 95px; }
+    .col-stock { min-width: 110px; text-align: center; }
+    .col-alimentacion { min-width: 100px; }
+    .col-acciones { min-width: 130px; }
+
     .admin-table-actions { display: flex; flex-wrap: wrap; gap: 6px; }
     .btn-pequeño { padding: 4px 8px; font-size: 12px; }
 
@@ -207,9 +228,7 @@
       main.admin-container { margin: 10px; padding: 12px; }
       .admin-form { grid-template-columns: 1fr; }
       .admin-form-full { grid-column: 1 / 2; }
-      .admin-buscador svg {
-        right: 16px;
-      }
+      .admin-buscador svg { right: 16px; }
     }
 
 /* ======= ADMIN: ESTADÍSTICAS ======= */
@@ -448,6 +467,11 @@
         </div>
 
         <div>
+          <label for="prod-sku">SKU (Código Único de Inventario)</label>
+          <input type="text" id="prod-sku" placeholder="Ej: TAL-DW-20V">
+        </div>
+
+        <div>
           <label for="prod-marca">Marca</label>
           <input type="text" id="prod-marca">
         </div>
@@ -519,7 +543,7 @@
     </div>
 
     <div class="admin-buscador">
-      <input type="text" id="buscador-admin" placeholder="Buscar producto por nombre, marca o código de barras...">
+      <input type="text" id="buscador-admin" placeholder="Buscar producto por nombre, SKU, marca o código de barras...">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="11" cy="11" r="8"></circle>
@@ -557,14 +581,15 @@
       <table class="admin-table">
         <thead>
         <tr>
-          <th>Nombre</th>
-          <th>Marca</th>
-          <th>Precio Costo</th>
-          <th>Precio Venta</th>
-          <th>Ganancia (u)</th>
-          <th>Stock</th>
-          <th>Alimentación</th>
-          <th>Acciones</th>
+          <th class="col-sku">SKU</th>
+          <th class="col-nombre">Nombre</th>
+          <th class="col-marca">Marca</th>
+          <th class="col-precio">Precio Costo</th>
+          <th class="col-precio">Precio Venta</th>
+          <th class="col-ganancia">Ganancia (u)</th>
+          <th class="col-stock">Stock</th>
+          <th class="col-alimentacion">Alimentación</th>
+          <th class="col-acciones">Acciones</th>
         </tr>
         </thead>
         <tbody id="tabla-productos-body">
@@ -593,7 +618,7 @@
           </div>
       </div>
       
-      <h2 style="font-size:18px;margin:6px 0 8px;">Detalle por Día</h2>
+      <h2 style="font-size:18px;margin:6px 0 8px;">Detail por Día</h2>
 
       <div id="historial-loader" style="text-align:center; padding: 20px;">
           Cargando historial...

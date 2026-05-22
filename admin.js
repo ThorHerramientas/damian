@@ -43,6 +43,7 @@ function toggleFormularioProducto(forzarAbrir = null) {
 function limpiarFormulario() {
   document.getElementById("prod-id").value = "";
   document.getElementById("prod-nombre").value = "";
+  document.getElementById("prod-sku").value = ""; 
   document.getElementById("prod-marca").value = "";
   document.getElementById("prod-costo").value = ""; 
   document.getElementById("prod-precio").value = "";
@@ -67,6 +68,7 @@ function cargarProductoEnFormulario(id, prod) {
 
   document.getElementById("prod-id").value = id;
   document.getElementById("prod-nombre").value = prod.nombre || "";
+  document.getElementById("prod-sku").value = prod.sku || ""; 
   document.getElementById("prod-marca").value = prod.marca || "";
   document.getElementById("prod-costo").value = prod.costo || ""; 
   document.getElementById("prod-precio").value = prod.precio || 0;
@@ -110,7 +112,7 @@ function productosFiltrados() {
 
   return listaFiltrada.filter(p => {
     const d = p.data;
-    const searchableText = (d.nombre || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
+    const searchableText = (d.nombre || '') + ' ' + (d.sku || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
     const searchableTextLower = searchableText.toLowerCase();
 
     const keywordMatch = keywords.every(keyword => searchableTextLower.includes(keyword));
@@ -173,7 +175,7 @@ function renderTablaProductos() {
   const lista = productosFiltrados();
 
   if (lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8">No se encontraron productos en esta vista.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9">No se encontraron productos en esta vista.</td></tr>`;
     return;
   }
 
@@ -181,8 +183,6 @@ function renderTablaProductos() {
     const stock = Number(p.data.stock) ?? 0;
     const costo = Number(p.data.costo) ?? 0;
     const precio = Number(p.data.precio) ?? 0;
-    
-    // CÁLCULO DE LA NUEVA COLUMNA: Precio Venta - Precio Costo
     const gananciaIndividual = precio - costo;
 
     let estiloFila = "";
@@ -195,14 +195,18 @@ function renderTablaProductos() {
     const tr = document.createElement("tr");
     if (estiloFila) tr.setAttribute("style", estiloFila.split('"')[1]); 
 
+    // FIX Y ACTUALIZACIÓN: Se incorporaron las clases de columnas correspondientes (col-sku, col-nombre, col-marca)
     tr.innerHTML = `
-      <td>
+      <td class="col-sku" style="font-weight: 600; color: #555; font-family: monospace;">
+        ${p.data.sku || "-"}
+      </td>
+      <td class="col-nombre">
         ${p.data.nombre || "-"}
         ${stock === 0 ? ' <span style="color:var(--rojo); font-weight:bold; font-size:11px;">[AGOTADO]</span>' : ''}
         ${stock > 0 && stock <= 2 ? ' <span style="color:#e65100; font-weight:bold; font-size:11px;">[STOCK CRÍTICO]</span>' : ''}
       </td>
-      <td>${p.data.marca || "-"}</td>
-      <td>
+      <td class="col-marca">${p.data.marca || "-"}</td>
+      <td class="col-precio">
         <div style="display:flex; align-items:center; gap:2px;">
           <span style="color:#777; font-size: 12px;">$</span>
           <input type="number" id="costo-input-${p.id}" value="${costo}" min="0" step="1" data-id="${p.id}"
@@ -211,7 +215,7 @@ function renderTablaProductos() {
           >
         </div>
       </td>
-      <td>
+      <td class="col-precio">
         <div style="display:flex; align-items:center; gap:2px;">
           <span style="color:#555; font-weight:500;">$</span>
           <input type="number" id="precio-input-${p.id}" value="${precio}" min="0" step="1" data-id="${p.id}"
@@ -220,10 +224,10 @@ function renderTablaProductos() {
           >
         </div>
       </td>
-      <td style="font-weight: 700; color: ${gananciaIndividual >= 0 ? '#2e7d32' : 'var(--rojo)'};">
+      <td class="col-ganancia" style="font-weight: 700; color: ${gananciaIndividual >= 0 ? '#2e7d32' : 'var(--rojo)'};">
         ${formatearPrecio(gananciaIndividual)}
       </td>
-      <td style="text-align: center;">
+      <td class="col-stock" style="text-align: center;">
         <div class="stock-controls" data-id="${p.id}" style="display:flex; align-items:center; justify-content:center; gap:4px;">
             <button class="btn-stock-quick" data-delta="-1" data-id="${p.id}" style="
                 padding: 1px 6px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer; border-radius: 4px; font-weight: bold;
@@ -237,8 +241,8 @@ function renderTablaProductos() {
             ">+</button>
         </div>
       </td>
-      <td>${p.data.alimentacion || "-"}</td>
-      <td>
+      <td class="col-alimentacion">${p.data.alimentacion || "-"}</td>
+      <td class="col-acciones">
         <div class="admin-table-actions">
           <button class="btn-principal btn-pequeño" data-accion="editar" data-id="${p.id}">Editar</button>
           <button class="btn-secundario btn-pequeño" data-accion="eliminar" data-id="${p.id}">Eliminar</button>
@@ -275,8 +279,6 @@ async function actualizarCostoRapidoPorInput(idProducto, nuevoValor) {
     try {
         await productosRef.doc(idProducto).update({ costo: nuevoCosto });
         prodEntry.data.costo = nuevoCosto; 
-        
-        // MODIFICACIÓN: Forzar re-render para recalcular el saldo de ganancia visual al instante
         renderTablaProductos();
     } catch (err) {
         console.error("Error actualizando costo rápido:", err);
@@ -299,8 +301,6 @@ async function actualizarPrecioRapidoPorInput(idProducto, nuevoValor) {
     try {
         await productosRef.doc(idProducto).update({ precio: nuevoPrecio });
         prodEntry.data.precio = nuevoPrecio; 
-        
-        // MODIFICACIÓN: Forzar re-render de la tabla para recalcular ganancia en vivo
         renderTablaProductos();
         renderEstadisticas();
     } catch (err) {
@@ -506,20 +506,23 @@ function buscarProductoParaVenta(input) {
     const inputLower = input.toLowerCase().trim();
     const inputNormalizado = input.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 
-    const matchByBarcode = productos.find(p => {
+    const matchBySkuOrBarcode = productos.find(p => {
+        const skuNormalizado = (p.data.sku || "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        if (skuNormalizado === inputNormalizado) return true;
+
         const codigosGuardados = p.data.codbarra ? p.data.codbarra.split(',') : [];
         return codigosGuardados.some(cod => {
             const codbarraGuardadoNormalizado = cod.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
             return codbarraGuardadoNormalizado === inputNormalizado; 
         });
     });
-    if (matchByBarcode) return [matchByBarcode]; 
+    if (matchBySkuOrBarcode) return [matchBySkuOrBarcode]; 
 
     const keywords = inputLower.split(/\s+/).filter(k => k.length > 0);
     
     const matchesByKeyword = productos.filter(p => {
         const d = p.data;
-        const searchableText = (d.nombre || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
+        const searchableText = (d.nombre || '') + ' ' + (d.sku || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
         const searchableTextLower = searchableText.toLowerCase();
         const keywordMatch = keywords.every(keyword => searchableTextLower.includes(keyword));
         return keywordMatch;
@@ -550,6 +553,141 @@ function agregarProductoEncontrado(productoEnStock) {
     }
 
     renderVentaPanel();
+}
+
+function liveSearchVenta() {
+    const inputEl = document.getElementById('venta-input-codbarra');
+    const input = inputEl.value;
+    
+    if (input.length < 2) {
+        renderVentaSuggestions([]);
+        return;
+    }
+
+    const resultados = buscarProductoParaVenta(input);
+    
+    if (resultados.length === 1 && resultados[0].data.codbarra && resultados[0].data.codbarra.includes(input)) {
+         agregarProductoEncontrado(resultados[0]);
+         inputEl.value = ''; 
+         renderVentaSuggestions([]); 
+         return;
+    }
+    
+    renderVentaSuggestions(resultados.slice(0, 8)); 
+}
+
+function renderVentaSuggestions(sugerencias) {
+    const listaSugerencias = document.getElementById('venta-sugerencias-list');
+    const inputEl = document.getElementById('venta-input-codbarra');
+    
+    if (!inputEl.value.trim() || sugerencias.length === 0) {
+        listaSugerencias.classList.add('oculto');
+        listaSugerencias.innerHTML = '';
+        return;
+    }
+
+    listaSugerencias.innerHTML = '';
+
+    sugerencias.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'sugerencia-item';
+        div.dataset.id = p.id; 
+        div.innerHTML = `
+            <span>${p.data.nombre} (${p.data.marca || '-'})</span>
+            <span style="font-weight: 600;">${formatearPrecio(p.data.precio)}</span>
+        `;
+        div.addEventListener('click', (e) => {
+            const id = e.currentTarget.dataset.id;
+            const productoSeleccionado = productos.find(prod => prod.id === id);
+            
+            if (productoSeleccionado) {
+                agregarProductoEncontrado(productoSeleccionado);
+                const inputEl = document.getElementById('venta-input-codbarra');
+                inputEl.value = ''; 
+                inputEl.focus(); 
+            }
+            renderVentaSuggestions([]); 
+        });
+        listaSugerencias.appendChild(div);
+    });
+
+    listaSugerencias.classList.remove('oculto');
+}
+
+async function confirmarVenta() {
+    if (ventaActual.length === 0) return;
+
+    try {
+        const updates = await db.runTransaction(async (transaction) => {
+            const resultList = [];
+            
+            const readPromises = ventaActual.map(item => {
+                const docRef = productosRef.doc(item.id);
+                return transaction.get(docRef);
+            });
+            
+            const docs = await Promise.all(readPromises);
+
+            for (let i = 0; i < ventaActual.length; i++) {
+                const item = ventaActual[i];
+                const doc = docs[i];
+
+                if (!doc.exists) {
+                    throw new Error(`El producto "${item.nombre}" no existe en la base de datos.`);
+                }
+                
+                const data = doc.data();
+                const stockActual = Number(data.stock) || 0;
+                const nuevoStock = stockActual - item.cantidad;
+
+                if (nuevoStock < 0) {
+                    throw new Error(`Stock insuficiente para "${item.nombre}". Disponible: ${stockActual}, solicitado: ${item.cantidad}.`);
+                }
+
+                transaction.update(doc.ref, { stock: nuevoStock });
+                resultList.push({ id: item.id, nuevoStock: nuevoStock });
+            }
+
+            return resultList;
+        });
+
+        updates.forEach(update => {
+            const prodEntry = productos.find(p => p.id === update.id);
+            if (prodEntry) prodEntry.data.stock = update.nuevoStock;
+        });
+
+        const totalSinDto = ventaActual.reduce((t, i) => t + i.precio * i.cantidad, 0);
+        const montoDescuento = totalSinDto * (porcentajeDescuento / 100);
+        const totalFinalVenta = totalSinDto - montoDescuento;
+
+        const ventaData = {
+            fecha: firebase.firestore.FieldValue.serverTimestamp(),
+            fechaString: new Date().toISOString().split('T')[0],
+            totalSinDescuento: totalSinDto,
+            montoDescuento: montoDescuento,
+            porcentajeDescuento: porcentajeDescuento,
+            totalFinal: totalFinalVenta,
+            items: ventaActual.map(item => ({
+                id: item.id,
+                nombre: item.nombre,
+                precioUnitario: item.precio,
+                cantidad: item.cantidad
+            }))
+        };
+        
+        await db.collection(COLECCION_VENTAS).add(ventaData);
+
+        alert(`Venta confirmada exitosamente.`);
+        
+        vaciarVenta();
+        renderTablaProductos();
+        renderEstadisticas();
+        cerrarVenta(); 
+
+    } catch (error) {
+        console.error("Error en la transacción:", error);
+        alert(`Error al confirmar la venta: ${error.message}`);
+    }
 }
 
 // ---------------------- HISTORIAL DE VENTAS Y GRÁFICOS ----------------------
@@ -800,8 +938,9 @@ function generarPDFStock() {
         return nombreA.localeCompare(nombreB);
     });
 
-    const headers = [['Nombre', 'Marca', 'Precio Costo', 'Precio Venta', 'Stock']];
+    const headers = [['SKU', 'Nombre', 'Marca', 'Precio Costo', 'Precio Venta', 'Stock']];
     const data = productosOrdenados.map(p => [
+        p.data.sku || '-',
         p.data.nombre || 'Sin nombre',
         p.data.marca || '-',
         formatearPrecio(p.data.costo || 0),
@@ -825,9 +964,10 @@ function generarPDFStock() {
         styles: { fontSize: 10, cellPadding: 2 },
         headStyles: { fillColor: [255, 214, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
         columnStyles: {
-            2: { halign: 'right', cellWidth: 28 }, 
-            3: { halign: 'right', cellWidth: 28 }, 
-            4: { halign: 'center' } 
+            0: { cellWidth: 25 },
+            3: { halign: 'right', cellWidth: 26 }, 
+            4: { halign: 'right', cellWidth: 26 }, 
+            5: { halign: 'center' } 
         },
         didDrawPage: function (data) {
             doc.setFontSize(8)
@@ -903,6 +1043,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const id = document.getElementById("prod-id").value.trim();
     const nombre = document.getElementById("prod-nombre").value.trim();
+    const sku = document.getElementById("prod-sku").value.trim(); 
     const marca = document.getElementById("prod-marca").value.trim();
     const costo = Number(document.getElementById("prod-costo").value || 0); 
     const precio = Number(document.getElementById("prod-precio").value || 0);
@@ -926,7 +1067,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const imagenPlaceholder = "https://via.placeholder.com/300x200?text=Producto";
     const imagenPrincipal = images.length > 0 ? images[0] : imagenPlaceholder;
 
-    const producto = { nombre, marca, costo, precio, stock, alimentacion, codbarra, imagen: imagenPrincipal, imagenes: images, descripcion: description, opcionesEnvio, detalles };
+    const producto = { nombre, sku, marca, costo, precio, stock, alimentacion, codbarra, imagen: imagenPrincipal, imagenes: images, descripcion: description, opcionesEnvio, detalles };
 
     try {
       if (id) {
