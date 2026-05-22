@@ -6,6 +6,7 @@ let productos = []; 		// [{id, data}]
 let filtroTexto = ""; 	  // texto del buscador
 let ventaActual = [];   // [{id: string, cantidad: number, precio: number, nombre: string}] 
 let porcentajeDescuento = 0; 
+let soloAgotados = false; 
 let myChartGanancia = null; 
 let myChartProductos = null;
 let myChartTransacciones = null;
@@ -19,10 +20,31 @@ function formatearPrecio(numero) {
   }).replace(/\s/g, '\u00A0'); 
 }
 
+function toggleFormularioProducto(forzarAbrir = null) {
+  const wrapper = document.getElementById("wrapper-formulario-producto");
+  const btn = document.getElementById("btn-toggle-formulario");
+  if (!wrapper || !btn) return;
+
+  const estaAbierto = wrapper.classList.contains("abierto");
+  const debeAbrir = (forzarAbrir !== null) ? forzarAbrir : !estaAbierto;
+
+  if (debeAbrir) {
+    wrapper.classList.add("abierto");
+    btn.innerHTML = "➖ Cerrar formulario";
+    btn.style.backgroundColor = "var(--rojo)";
+  } else {
+    wrapper.classList.remove("abierto");
+    btn.innerHTML = "➕ Agregar nuevo producto";
+    btn.style.backgroundColor = "#2e7d32";
+    limpiarFormulario();
+  }
+}
+
 function limpiarFormulario() {
   document.getElementById("prod-id").value = "";
   document.getElementById("prod-nombre").value = "";
   document.getElementById("prod-marca").value = "";
+  document.getElementById("prod-costo").value = ""; // ACTUALIZACIÓN: Limpieza precio costo
   document.getElementById("prod-precio").value = "";
   document.getElementById("prod-stock").value = "";
   document.getElementById("prod-codbarra").value = ""; 
@@ -41,9 +63,12 @@ function limpiarFormulario() {
 }
 
 function cargarProductoEnFormulario(id, prod) {
+  toggleFormularioProducto(true);
+
   document.getElementById("prod-id").value = id;
   document.getElementById("prod-nombre").value = prod.nombre || "";
   document.getElementById("prod-marca").value = prod.marca || "";
+  document.getElementById("prod-costo").value = prod.costo || ""; // ACTUALIZACIÓN: Cargar precio costo
   document.getElementById("prod-precio").value = prod.precio || 0;
   document.getElementById("prod-stock").value = prod.stock || 0;
   document.getElementById("prod-codbarra").value = prod.codbarra || ""; 
@@ -71,13 +96,19 @@ function cargarProductoEnFormulario(id, prod) {
 }
 
 function productosFiltrados() {
-  if (!filtroTexto) return productos;
+  let listaFiltrada = productos;
+
+  if (soloAgotados) {
+    listaFiltrada = listaFiltrada.filter(p => (Number(p.data.stock) ?? 0) === 0);
+  }
+
+  if (!filtroTexto) return listaFiltrada;
   const t = filtroTexto.toLowerCase().trim();
   
   const tNormalizado = filtroTexto.replace(/[^a-zA-Z0-9\s]/g, "").toLowerCase();
   const keywords = tNormalizado.split(/\s+/).filter(k => k.length > 0);
 
-  return productos.filter(p => {
+  return listaFiltrada.filter(p => {
     const d = p.data;
     const searchableText = (d.nombre || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
     const searchableTextLower = searchableText.toLowerCase();
@@ -142,7 +173,7 @@ function renderTablaProductos() {
   const lista = productosFiltrados();
 
   if (lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6">No se encontraron productos.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">No se encontraron productos en esta vista.</td></tr>`;
     return;
   }
 
@@ -159,6 +190,7 @@ function renderTablaProductos() {
     const tr = document.createElement("tr");
     if (estiloFila) tr.setAttribute("style", estiloFila.split('"')[1]); 
 
+    // ACTUALIZACIÓN: Se incorporó la columna inline del input rápido de Precio de Costo
     tr.innerHTML = `
       <td>
         ${p.data.nombre || "-"}
@@ -166,6 +198,15 @@ function renderTablaProductos() {
         ${stock > 0 && stock <= 2 ? ' <span style="color:#e65100; font-weight:bold; font-size:11px;">[STOCK CRÍTICO]</span>' : ''}
       </td>
       <td>${p.data.marca || "-"}</td>
+      <td>
+        <div style="display:flex; align-items:center; gap:2px;">
+          <span style="color:#777; font-size: 12px;">$</span>
+          <input type="number" id="costo-input-${p.id}" value="${p.data.costo ?? 0}" min="0" step="1" data-id="${p.id}"
+              style="width: 80px; border: 1px solid #ccc; border-radius: 4px; padding: 2px 4px; font-size: 13px; background-color: #fafafa;" 
+              class="costo-input-edit"
+          >
+        </div>
+      </td>
       <td>
         <div style="display:flex; align-items:center; gap:2px;">
           <span style="color:#555; font-weight:500;">$</span>
@@ -211,6 +252,29 @@ async function cargarProductosDesdeFirestore() {
   renderTablaProductos(); 	
 }
 
+// NUEVA FUNCIÓN: Actualización rápida por teclado del costo inline en la fila
+async function actualizarCostoRapidoPorInput(idProducto, nuevoValor) {
+    const prodEntry = productos.find(p => p.id === idProducto);
+    if (!prodEntry) return;
+
+    let nuevoCosto = Number(nuevoValor);
+    if (isNaN(nuevoCosto) || nuevoCosto < 0) {
+        mostrarAlertaStock("Precio de costo inválido.");
+        const inputEl = document.getElementById(`costo-input-${idProducto}`);
+        if(inputEl) inputEl.value = prodEntry.data.costo ?? 0;
+        return;
+    }
+    nuevoCosto = Math.round(nuevoCosto);
+
+    try {
+        await productosRef.doc(idProducto).update({ costo: nuevoCosto });
+        prodEntry.data.costo = nuevoCosto; 
+        console.log(`Costo de ${prodEntry.data.nombre} cambiado a $${nuevoCosto}.`);
+    } catch (err) {
+        console.error("Error actualizando costo rápido:", err);
+    }
+}
+
 async function actualizarPrecioRapidoPorInput(idProducto, nuevoValor) {
     const prodEntry = productos.find(p => p.id === idProducto);
     if (!prodEntry) return;
@@ -222,7 +286,6 @@ async function actualizarPrecioRapidoPorInput(idProducto, nuevoValor) {
         if(inputEl) inputEl.value = prodEntry.data.precio ?? 0;
         return;
     }
-    
     nuevoPrecio = Math.round(nuevoPrecio);
 
     try {
@@ -246,7 +309,6 @@ async function actualizarStockRapidoPorInput(idProducto, nuevoValor) {
         if(inputEl) inputEl.value = prodEntry.data.stock ?? 0;
         return;
     }
-    
     nuevoStock = Math.round(nuevoStock);
 
     try {
@@ -477,141 +539,6 @@ function agregarProductoEncontrado(productoEnStock) {
     }
 
     renderVentaPanel();
-}
-
-function liveSearchVenta() {
-    const inputEl = document.getElementById('venta-input-codbarra');
-    const input = inputEl.value;
-    
-    if (input.length < 2) {
-        renderVentaSuggestions([]);
-        return;
-    }
-
-    const resultados = buscarProductoParaVenta(input);
-    
-    if (resultados.length === 1 && resultados[0].data.codbarra && resultados[0].data.codbarra.includes(input)) {
-         agregarProductoEncontrado(resultados[0]);
-         inputEl.value = ''; 
-         renderVentaSuggestions([]); 
-         return;
-    }
-    
-    renderVentaSuggestions(resultados.slice(0, 8)); 
-}
-
-function renderVentaSuggestions(sugerencias) {
-    const listaSugerencias = document.getElementById('venta-sugerencias-list');
-    const inputEl = document.getElementById('venta-input-codbarra');
-    
-    if (!inputEl.value.trim() || sugerencias.length === 0) {
-        listaSugerencias.classList.add('oculto');
-        listaSugerencias.innerHTML = '';
-        return;
-    }
-
-    listaSugerencias.innerHTML = '';
-
-    sugerencias.forEach(p => {
-        const div = document.createElement('div');
-        div.className = 'sugerencia-item';
-        div.dataset.id = p.id; 
-        div.innerHTML = `
-            <span>${p.data.nombre} (${p.data.marca || '-'})</span>
-            <span style="font-weight: 600;">${formatearPrecio(p.data.precio)}</span>
-        `;
-        div.addEventListener('click', (e) => {
-            const id = e.currentTarget.dataset.id;
-            const productoSeleccionado = productos.find(prod => prod.id === id);
-            
-            if (productoSeleccionado) {
-                agregarProductoEncontrado(productoSeleccionado);
-                const inputEl = document.getElementById('venta-input-codbarra');
-                inputEl.value = ''; 
-                inputEl.focus(); 
-            }
-            renderVentaSuggestions([]); 
-        });
-        listaSugerencias.appendChild(div);
-    });
-
-    listaSugerencias.classList.remove('oculto');
-}
-
-async function confirmarVenta() {
-    if (ventaActual.length === 0) return;
-
-    try {
-        const updates = await db.runTransaction(async (transaction) => {
-            const resultList = [];
-            
-            const readPromises = ventaActual.map(item => {
-                const docRef = productosRef.doc(item.id);
-                return transaction.get(docRef);
-            });
-            
-            const docs = await Promise.all(readPromises);
-
-            for (let i = 0; i < ventaActual.length; i++) {
-                const item = ventaActual[i];
-                const doc = docs[i];
-
-                if (!doc.exists) {
-                    throw new Error(`El producto "${item.nombre}" no existe en la base de datos.`);
-                }
-                
-                const data = doc.data();
-                const stockActual = Number(data.stock) || 0;
-                const nuevoStock = stockActual - item.cantidad;
-
-                if (nuevoStock < 0) {
-                    throw new Error(`Stock insuficiente para "${item.nombre}". Disponible: ${stockActual}, solicitado: ${item.cantidad}.`);
-                }
-
-                transaction.update(doc.ref, { stock: nuevoStock });
-                resultList.push({ id: item.id, nuevoStock: nuevoStock });
-            }
-
-            return resultList;
-        });
-
-        updates.forEach(update => {
-            const prodEntry = productos.find(p => p.id === update.id);
-            if (prodEntry) prodEntry.data.stock = update.nuevoStock;
-        });
-
-        const totalSinDto = ventaActual.reduce((t, i) => t + i.precio * i.cantidad, 0);
-        const montoDescuento = totalSinDto * (porcentajeDescuento / 100);
-        const totalFinalVenta = totalSinDto - montoDescuento;
-
-        const ventaData = {
-            fecha: firebase.firestore.FieldValue.serverTimestamp(),
-            fechaString: new Date().toISOString().split('T')[0],
-            totalSinDescuento: totalSinDto,
-            montoDescuento: montoDescuento,
-            porcentajeDescuento: porcentajeDescuento,
-            totalFinal: totalFinalVenta,
-            items: ventaActual.map(item => ({
-                id: item.id,
-                nombre: item.nombre,
-                precioUnitario: item.precio,
-                cantidad: item.cantidad
-            }))
-        };
-        
-        await db.collection(COLECCION_VENTAS).add(ventaData);
-
-        alert(`Venta confirmada exitosamente.`);
-        
-        vaciarVenta();
-        renderTablaProductos();
-        renderEstadisticas();
-        cerrarVenta(); 
-
-    } catch (error) {
-        console.error("Error en la transacción:", error);
-        alert(`Error al confirmar la venta: ${error.message}`);
-    }
 }
 
 // ---------------------- HISTORIAL DE VENTAS Y GRÁFICOS ----------------------
@@ -917,6 +844,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnShowProductos = document.getElementById('btn-show-productos');
   const btnShowHistorial = document.getElementById('btn-show-historial');
   
+  const btnToggleFormulario = document.getElementById('btn-toggle-formulario');
+  const cardFiltroAgotados = document.getElementById('btn-filtro-agotados');
+  const alertaFiltro = document.getElementById('alerta-filtro-activo');
+  const btnQuitarAlertaFiltro = document.getElementById('btn-quitar-filtro-agotados');
+
   cargarProductosDesdeFirestore().catch(err => {
     console.error("Error cargando productos:", err);
     alert("Hubo un problema cargando los productos.");
@@ -925,6 +857,26 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnDescargarPDF) btnDescargarPDF.addEventListener("click", generarPDFStock);
   if (btnShowProductos) btnShowProductos.addEventListener('click', () => mostrarPanel('productos'));
   if (btnShowHistorial) btnShowHistorial.addEventListener('click', () => mostrarPanel('historial'));
+
+  if (btnToggleFormulario) {
+    btnToggleFormulario.addEventListener('click', () => toggleFormularioProducto());
+  }
+
+  const aplicarOQuitarFiltroAgotados = () => {
+      soloAgotados = !soloAgotados;
+      
+      if (soloAgotados) {
+          cardFiltroAgotados.classList.add('activo-filtro');
+          alertaFiltro.classList.remove('oculto');
+      } else {
+          cardFiltroAgotados.classList.remove('activo-filtro');
+          alertaFiltro.classList.add('oculto');
+      }
+      renderTablaProductos();
+  };
+
+  if (cardFiltroAgotados) cardFiltroAgotados.addEventListener('click', aplicarOQuitarFiltroAgotados);
+  if (btnQuitarAlertaFiltro) btnQuitarAlertaFiltro.addEventListener('click', aplicarOQuitarFiltroAgotados);
 
   if (inputBuscador) {
     inputBuscador.addEventListener("input", () => {
@@ -939,6 +891,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const id = document.getElementById("prod-id").value.trim();
     const nombre = document.getElementById("prod-nombre").value.trim();
     const marca = document.getElementById("prod-marca").value.trim();
+    const costo = Number(document.getElementById("prod-costo").value || 0); // ACTUALIZACIÓN: Recibir valor costo
     const precio = Number(document.getElementById("prod-precio").value || 0);
     const stock = Number(document.getElementById("prod-stock").value || 0);
     const alimentacion = document.getElementById("prod-alimentacion").value;
@@ -956,11 +909,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const opcionesEnvio = enviosText.split(",").map(t => t.trim()).filter(Boolean);
     const detalles = detallesText.split("\n").map(t => t.trim()).filter(Boolean);
 
-    const imagenes = imagenTexto ? imagenTexto.split(",").map(u => u.trim()).filter(Boolean) : [];
+    const images = imagenTexto ? imagenTexto.split(",").map(u => u.trim()).filter(Boolean) : [];
     const imagenPlaceholder = "https://via.placeholder.com/300x200?text=Producto";
-    const imagenPrincipal = imagenes.length > 0 ? imagenes[0] : imagenPlaceholder;
+    const imagenPrincipal = images.length > 0 ? images[0] : imagenPlaceholder;
 
-    const producto = { nombre, marca, precio, stock, alimentacion, codbarra, imagen: imagenPrincipal, imagenes, description, opcionesEnvio, detalles };
+    // ACTUALIZACIÓN: Propiedad 'costo' integrada al objeto del payload de Firebase
+    const producto = { nombre, marca, costo, precio, stock, alimentacion, codbarra, imagen: imagenPrincipal, imagenes: images, descripcion: description, opcionesEnvio, detalles };
 
     try {
       if (id) {
@@ -970,7 +924,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await productosRef.add(producto);
         alert("Producto creado correctamente.");
       }
-      limpiarFormulario();
+      toggleFormularioProducto(false);
       await cargarProductosDesdeFirestore(); 
     } catch (err) {
       console.error("Error guardando producto:", err);
@@ -978,64 +932,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  if (btnRealizarVenta) btnRealizarVenta.addEventListener('click', abrirVenta);
-  if (btnVaciarVenta) btnVaciarVenta.addEventListener('click', vaciarVenta);
-  if (btnConfirmarVenta) btnConfirmarVenta.addEventListener('click', confirmarVenta);
+  // Evento change de costo inline añadido
+  tbody.addEventListener("change", async (e) => {
+    if (e.target.classList.contains("costo-input-edit")) {
+      const id = e.target.dataset.id;
+      const nuevoValor = e.target.value;
+      await actualizarCostoRapidoPorInput(id, nuevoValor);
+    }
+  });
 
-  if (inputCodBarraVenta) {
-    inputCodBarraVenta.addEventListener('input', liveSearchVenta);
-    inputCodBarraVenta.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const codbarra = inputCodBarraVenta.value.trim();
-            if (!codbarra) return; 
+  tbody.addEventListener("change", async (e) => {
+    if (e.target.classList.contains("precio-input-edit")) {
+      const id = e.target.dataset.id;
+      const nuevoValor = e.target.value;
+      await actualizarPrecioRapidoPorInput(id, nuevoValor);
+    }
+  });
 
-            const resultados = buscarProductoParaVenta(codbarra);
-            if (resultados.length === 1) {
-                agregarProductoEncontrado(resultados[0]); 
-                setTimeout(() => {
-                    inputCodBarraVenta.value = ''; 
-                    renderVentaSuggestions([]);
-                    inputCodBarraVenta.focus(); 
-                }, 50); 
-                return;
-            } 
-            if (resultados.length > 1) {
-                mostrarAlertaStock("Se encontraron múltiples coincidencias. Por favor, seleccione un producto de la lista.");
-                return;
-            }
-            inputCodBarraVenta.value = '';
-            renderVentaSuggestions([]);
-            return;
-        }
-    });
-    inputCodBarraVenta.addEventListener('blur', () => {
-         setTimeout(() => renderVentaSuggestions([]), 200);
-    });
-  }
-
-  const ventaItemsList = document.getElementById('venta-items-list');
-  if (ventaItemsList) {
-      ventaItemsList.addEventListener('click', (e) => {
-          if (e.target.classList.contains('btn-eliminar-venta-item')) {
-              const id = e.target.dataset.id;
-              if (id) eliminarItemVenta(id);
-          }
-      });
-  }
-
-  if (btnApplyDiscount) btnApplyDiscount.addEventListener('click', aplicarDescuento);
-  if (btnQuitarDescuento) btnQuitarDescuento.addEventListener('click', quitarDescuento);
-  
-  if (inputDescuento) {
-    inputDescuento.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            aplicarDescuento();
-        }
-    });
-    inputDescuento.addEventListener('blur', aplicarDescuento);
-  }
+  tbody.addEventListener("change", async (e) => {
+    if (e.target.classList.contains("stock-input-edit")) {
+      const id = e.target.dataset.id;
+      const nuevoValor = e.target.value;
+      await actualizarStockRapidoPorInput(id, nuevoValor);
+    }
+  });
 
   tbody.addEventListener("click", async (e) => {
     const accion = e.target.dataset.accion;
@@ -1066,22 +986,6 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("Error de eliminación:", err);
         alert("No se pudo eliminar el producto.");
       }
-    }
-  });
-  
-  tbody.addEventListener("change", async (e) => {
-    if (e.target.classList.contains("precio-input-edit")) {
-      const id = e.target.dataset.id;
-      const nuevoValor = e.target.value;
-      await actualizarPrecioRapidoPorInput(id, nuevoValor);
-    }
-  });
-
-  tbody.addEventListener("change", async (e) => {
-    if (e.target.classList.contains("stock-input-edit")) {
-      const id = e.target.dataset.id;
-      const nuevoValor = e.target.value;
-      await actualizarStockRapidoPorInput(id, nuevoValor);
     }
   });
   

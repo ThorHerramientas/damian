@@ -72,11 +72,24 @@
     }
     .admin-container h1 { font-size: 22px; margin: 0 0 8px; }
 
+    /* Contenedor colapsable del formulario */
+    .formulario-colapsable {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease-out, margin 0.3s ease;
+      opacity: 0;
+    }
+    .formulario-colapsable.abierto {
+      max-height: 1200px; 
+      opacity: 1;
+      margin-top: 15px;
+      margin-bottom: 20px;
+    }
+
     .admin-form {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px 16px;
-      margin-bottom: 10px;
     }
     .admin-form label {
       font-size: 13px;
@@ -130,7 +143,7 @@
       border-collapse: collapse;
       font-size: 13px;
       margin-top: 8px;
-      min-width: 600px;
+      min-width: 700px; /* Incrementado por nueva columna */
     }
     .admin-table thead { background-color: #f5f5f5; }
     .admin-table th, .admin-table td {
@@ -143,7 +156,7 @@
     .btn-pequeño { padding: 4px 8px; font-size: 12px; }
 
     footer.footer { text-align: center; padding: 12px; font-size: 12px; color: #555; }
-    .oculto { display: none; }
+    .oculto { display: none !important; }
 
     /* LOGIN */
     .login-overlay {
@@ -209,6 +222,21 @@
 .admin-stats .stat{
   background:#fff; border:1px solid var(--borde); border-radius:10px;
   padding:12px; display:flex; flex-direction:column; gap:4px;
+}
+.admin-stats .stat-btn-interactivo {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.admin-stats .stat-btn-interactivo:hover {
+  background: #fdf2f2;
+  border-color: var(--rojo);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(198, 40, 40, 0.1);
+}
+.admin-stats .stat-btn-interactivo.activo-filtro {
+  background: #fce4e4;
+  border-color: var(--rojo);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
 }
 .stat-label{ font-size:13px; color:#555; }
 .stat-value{ font-size:20px; font-weight:800; color:#222; }
@@ -295,7 +323,7 @@
         background-color: #f0f0f0;
     }
   
-  /* NUEVOS ESTILOS VENTA RÁPIDA (para botón de eliminar individual) */
+  /* NUEVOS ESTILOS VENTA RÁPIDA */
   .venta-item-row {
       display: flex;
       align-items: center;
@@ -306,11 +334,11 @@
   .btn-eliminar-venta-item {
       background: none;
       border: none;
-      color: var(--rojo); /* Rojo definido en :root */
+      color: var(--rojo); 
       cursor: pointer;
       font-size: 14px;
       padding: 0 4px; 
-      margin-left: auto; /* Empuja el botón al final de la fila */
+      margin-left: auto; 
   }
 
   /* MOBILE RESPONSIVE FIXES */
@@ -396,85 +424,99 @@
       Desde acá podés agregar, editar o eliminar productos. Los cambios se guardan en Firestore y se ven en la tienda.
     </p>
 
-    <button type="button" id="btn-realizar-venta" class="btn-principal" style="margin-right: 12px;">
-      🛒 Realizar Venta Rápida
-    </button>
-    
-    <button type="button" id="btn-descargar-stock-pdf" class="btn-secundario" style="margin-bottom: 12px;">
-      ⬇️ Descargar Reporte de Stock (PDF)
-    </button>
-    <form id="form-producto" class="admin-form">
-      <input type="hidden" id="prod-id">
+    <div style="margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 10px;">
+      <button type="button" id="btn-toggle-formulario" class="btn-principal" style="background-color: #2e7d32;">
+        ➕ Agregar nuevo producto
+      </button>
+      
+      <button type="button" id="btn-realizar-venta" class="btn-principal">
+        🛒 Realizar Venta Rápida
+      </button>
+      
+      <button type="button" id="btn-descargar-stock-pdf" class="btn-secundario">
+        ⬇️ Descargar Reporte de Stock (PDF)
+      </button>
+    </div>
 
-      <div>
-        <label for="prod-nombre">Nombre</label>
-        <input type="text" id="prod-nombre" required>
-      </div>
+    <div id="wrapper-formulario-producto" class="formulario-colapsable">
+      <form id="form-producto" class="admin-form">
+        <input type="hidden" id="prod-id">
 
-      <div>
-        <label for="prod-marca">Marca</label>
-        <input type="text" id="prod-marca">
-      </div>
-
-      <div>
-        <label for="prod-precio">Precio (ARS)</label>
-        <input type="number" id="prod-precio" min="0" step="1" required>
-      </div>
-
-      <div>
-        <label for="prod-stock">Stock</label>
-        <input type="number" id="prod-stock" min="0" step="1" required>
-      </div>
-
-      <div>
-        <label for="prod-codbarra">Código de Barras (opcional)</label>
-        <input type="text" id="prod-codbarra" placeholder="EAN13, UPC, etc.">
-      </div>
-
-      <div>
-          <label for="prod-alimentacion">Alimentación</label>
-          <select id="prod-alimentacion">
-              <option value="Eléctrico">Eléctrico</option>
-              <option value="Inalámbrico">Inalámbrico</option>
-              <option value="Manual">Manual</option>
-              <option value="Combustión">Combustión</option>
-              <option value="Otro">Otro/Desconocido</option>
-          </select>
-      </div>
-      <div class="admin-form-full">
-        <label>Imagen del producto</label>
-        <input type="file" id="prod-imagen-archivo" accept="image/*">
-        <small>O pegá una URL directa (o varias separadas por coma):</small>
-        <input type="text" id="prod-imagen" placeholder="https://... , https://...">
-        <div id="preview-contenedor" class="preview-contenedor oculto">
-          <span style="font-size:12px;color:#555;">Vista previa (1ª imagen):</span>
-          <img id="preview-imagen" src="" alt="Vista previa">
+        <div>
+          <label for="prod-nombre">Nombre</label>
+          <input type="text" id="prod-nombre" required>
         </div>
-        <div id="estado-subida" class="estado-subida"></div>
-      </div>
 
-      <div class="admin-form-full">
-        <label for="prod-descripcion">Descripción corta</label>
-        <textarea id="prod-descripcion"></textarea>
-      </div>
+        <div>
+          <label for="prod-marca">Marca</label>
+          <input type="text" id="prod-marca">
+        </div>
 
-      <div class="admin-form-full">
-        <label for="prod-envios">Opciones de envío (separadas por coma)</label>
-        <input type="text" id="prod-envios" placeholder="Envío a domicilio, Retiro en el local, Envío a todo el país">
-      </div>
+        <div>
+          <label for="prod-costo">Precio de Costo (ARS)</label>
+          <input type="number" id="prod-costo" min="0" step="1" placeholder="Ej: 4500">
+        </div>
 
-      <div class="admin-form-full">
-        <label for="prod-detalles">Detalles (una característica por línea)</label>
-        <textarea id="prod-detalles" placeholder="Potencia: 600W
-Incluye maletín
-Garantía: 1 año"></textarea>
-      </div>
+        <div>
+          <label for="prod-precio">Precio de Venta (ARS)</label>
+          <input type="number" id="prod-precio" min="0" step="1" required>
+        </div>
 
-      <div class="admin-form-full admin-buttons">
-        <button type="submit" class="btn-principal">Guardar producto</button>
-        <button type="button" id="btn-limpiar-form" class="btn-secundario">Limpiar formulario</button>
-      </div>
-    </form>
+        <div>
+          <label for="prod-stock">Stock</label>
+          <input type="number" id="prod-stock" min="0" step="1" required>
+        </div>
+
+        <div>
+          <label for="prod-codbarra">Código de Barras (opcional)</label>
+          <input type="text" id="prod-codbarra" placeholder="EAN13, UPC, etc.">
+        </div>
+
+        <div>
+            <label for="prod-alimentacion">Alimentación</label>
+            <select id="prod-alimentacion">
+                <option value="Eléctrico">Eléctrico</option>
+                <option value="Inalámbrico">Inalámbrico</option>
+                <option value="Manual">Manual</option>
+                <option value="Combustión">Combustión</option>
+                <option value="Otro">Otro/Desconocido</option>
+            </select>
+        </div>
+        <div class="admin-form-full">
+          <label>Imagen del producto</label>
+          <input type="file" id="prod-imagen-archivo" accept="image/*">
+          <small>O pegá una URL directa (o varias separadas por coma):</small>
+          <input type="text" id="prod-imagen" placeholder="https://... , https://...">
+          <div id="preview-contenedor" class="preview-contenedor oculto">
+            <span style="font-size:12px;color:#555;">Vista previa (1ª imagen):</span>
+            <img id="preview-imagen" src="" alt="Vista previa">
+          </div>
+          <div id="estado-subida" class="estado-subida"></div>
+        </div>
+
+        <div class="admin-form-full">
+          <label for="prod-descripcion">Descripción corta</label>
+          <textarea id="prod-descripcion"></textarea>
+        </div>
+
+        <div class="admin-form-full">
+          <label for="prod-envios">Opciones de envío (separadas por coma)</label>
+          <input type="text" id="prod-envios" placeholder="Envío a domicilio, Retiro en el local, Envío a todo el país">
+        </div>
+
+        <div class="admin-form-full">
+          <label for="prod-detalles">Detalles (una característica por línea)</label>
+          <textarea id="prod-detalles" placeholder="Potencia: 600W
+  Incluye maletín
+  Garantía: 1 año"></textarea>
+        </div>
+
+        <div class="admin-form-full admin-buttons">
+          <button type="submit" class="btn-principal">Guardar producto</button>
+          <button type="button" id="btn-limpiar-form" class="btn-secundario">Limpiar formulario</button>
+        </div>
+      </form>
+    </div>
 
     <div class="admin-buscador">
       <input type="text" id="buscador-admin" placeholder="Buscar producto por nombre, marca o código de barras...">
@@ -485,24 +527,29 @@ Garantía: 1 año"></textarea>
       </svg>
     </div>
 
-  <section id="admin-stats" class="admin-stats">
-    <div class="stat">
-      <span class="stat-label">📦 Productos totales</span>
-      <span id="stat-total" class="stat-value">—</span>
+    <section id="admin-stats" class="admin-stats">
+      <div class="stat">
+        <span class="stat-label">📦 Productos totales</span>
+        <span id="stat-total" class="stat-value">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">⚙️ Activos (stock > 0)</span>
+        <span id="stat-activos" class="stat-value">—</span>
+      </div>
+      <div class="stat stat-btn-interactivo" id="btn-filtro-agotados" title="Hacé clic para ver solo los productos agotados">
+        <span class="stat-label">⛔ Agotados (Ver lista)</span>
+        <span id="stat-agotados" class="stat-value">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">💰 Valor total de stock</span>
+        <span id="stat-valor" class="stat-value">—</span>
+      </div>
+    </section>
+
+    <div id="alerta-filtro-activo" class="oculto" style="background-color: #ffebee; border: 1px solid var(--rojo); padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; color: var(--rojo); font-weight: 600;">
+       <span>⚠️ Mostrando únicamente productos agotados.</span>
+       <button type="button" id="btn-quitar-filtro-agotados" class="btn-secundario btn-pequeño" style="background-color: #fff; border: 1px solid var(--rojo); color: var(--rojo);">Mostrar todos</button>
     </div>
-    <div class="stat">
-      <span class="stat-label">⚙️ Activos (stock > 0)</span>
-      <span id="stat-activos" class="stat-value">—</span>
-    </div>
-    <div class="stat">
-      <span class="stat-label">⛔ Agotados</span>
-      <span id="stat-agotados" class="stat-value">—</span>
-    </div>
-    <div class="stat">
-      <span class="stat-label">💰 Valor total de stock</span>
-      <span id="stat-valor" class="stat-value">—</span>
-    </div>
-  </section>
 
     <h2 style="font-size:18px;margin:6px 0 8px;">Listado de productos</h2>
 
@@ -512,7 +559,8 @@ Garantía: 1 año"></textarea>
         <tr>
           <th>Nombre</th>
           <th>Marca</th>
-          <th>Precio</th>
+          <th>Precio Costo</th>
+          <th>Precio Venta</th>
           <th>Stock</th>
           <th>Alimentación</th>
           <th>Acciones</th>
@@ -564,7 +612,6 @@ Garantía: 1 año"></textarea>
   <div id="venta-panel" class="login-card" style="
       max-width: 500px; width: 95%; text-align: left; padding: 20px 25px; 
       border-top: 4px solid var(--primario); position: relative;
-      /* FIX: Permite el desplazamiento interno */
       display: flex; flex-direction: column; max-height: 95vh;
   ">
     <button id="btn-cerrar-venta" onclick="cerrarVenta()" style="position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 20px; cursor: pointer;">✕</button>
@@ -578,7 +625,7 @@ Garantía: 1 año"></textarea>
 
         <div id="venta-sugerencias-list" class="oculto" style="
             position: absolute;
-            top: 100%; /* Justo debajo del input */
+            top: 100%; 
             left: 0;
             width: 100%;
             z-index: 10;
@@ -594,7 +641,6 @@ Garantía: 1 año"></textarea>
     <h3 style="font-size: 16px; margin-bottom: 8px;">Detalle de la Venta:</h3>
     
     <div id="venta-items-list" style="
-        /* FIX: Permite que la lista crezca y tenga scroll propio */
         flex-grow: 1;
         overflow-y: auto;
         border: 1px solid var(--borde); border-radius: 4px; padding: 10px; margin-bottom: 10px; background: #fafafa; font-size: 13px;
@@ -626,6 +672,16 @@ Garantía: 1 año"></textarea>
     </div>
   </div>
 </div>
+
+<div id="venta-alerta-stock" class="login-overlay oculto" style="z-index: 9999; display: none; background: rgba(0,0,0,0.5);">
+  <div class="login-card" style="border-top-color: var(--rojo); max-width: 400px;">
+    <div class="login-icon">⚠️</div>
+    <h2 style="font-size: 18px;">Control de Stock</h2>
+    <p id="venta-alerta-mensaje" style="margin: 10px 0 15px; font-size: 14px; font-weight: 500;"></p>
+    <button type="button" id="btn-cerrar-alerta-stock" class="login-btn" style="background-color: var(--rojo);">Entendido (Enter)</button>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>
@@ -648,7 +704,7 @@ Garantía: 1 año"></textarea>
   const db = firebase.firestore();
   const storage = firebase.storage();
 
-  const ADMIN_PASSWORD = "thor2025"; // cambiá esta clave cuando quieras
+  const ADMIN_PASSWORD = "thor2025"; 
 
   document.addEventListener("DOMContentLoaded", () => {
     const loginOverlay = document.getElementById("login-overlay");
@@ -657,11 +713,9 @@ Garantía: 1 año"></textarea>
     const inputPass = document.getElementById("admin-password-input");
     const errorBox = document.getElementById("admin-login-error");
 
-    // Login simple (sesión memoria)
     if (sessionStorage.getItem("adminLogged") === "true") {
       loginOverlay.style.display = "none";
       adminMain.classList.remove("oculto");
-      // Muestra el panel de gestión de productos por defecto al iniciar sesión
       mostrarPanel('productos');
     }
 
@@ -680,7 +734,6 @@ Garantía: 1 año"></textarea>
       }
     });
 
-    // --------- SUBIDA DE IMAGEN A STORAGE ---------
     const archivoInput = document.getElementById("prod-imagen-archivo");
     const urlInput = document.getElementById("prod-imagen");
     const estado = document.getElementById("estado-subida");
@@ -702,7 +755,6 @@ Garantía: 1 año"></textarea>
           const snapshot = await ref.put(file);
           const downloadURL = await snapshot.ref.getDownloadURL();
 
-          // si ya había URLs, agregamos coma y la nueva
           if (urlInput.value.trim().length > 0) {
             urlInput.value = urlInput.value.trim() + ", " + downloadURL;
           } else {
@@ -723,7 +775,6 @@ Garantía: 1 año"></textarea>
     }
   });
 
-  // Función global para cambiar entre paneles (Productos/Historial)
   function mostrarPanel(panelId) {
       const gestionCont = document.getElementById('gestion-productos-container');
       const historialCont = document.getElementById('historial-ventas-container');
@@ -744,7 +795,7 @@ Garantía: 1 año"></textarea>
           btnProd.classList.add('btn-secundario');
           btnHist.classList.add('btn-principal');
           btnHist.classList.remove('btn-secundario');
-          cargarHistorialVentas(); // Carga el reporte al mostrar el historial
+          cargarHistorialVentas(); 
       }
   }
 </script>
