@@ -149,7 +149,15 @@ function renderTablaProductos() {
     tr.innerHTML = `
       <td>${p.data.nombre || "-"}</td>
       <td>${p.data.marca || "-"}</td>
-      <td>${formatearPrecio(p.data.precio || 0)}</td>
+      <td>
+        <div style="display:flex; align-items:center; gap:2px;">
+          <span style="color:#555; font-weight:500;">$</span>
+          <input type="number" id="precio-input-${p.id}" value="${p.data.precio ?? 0}" min="0" step="1" data-id="${p.id}"
+              style="width: 85px; border: 1px solid #ccc; border-radius: 4px; padding: 2px 4px; font-size: 13px;" 
+              class="precio-input-edit"
+          >
+        </div>
+      </td>
       <td style="text-align: center;">
         <div class="stock-controls" data-id="${p.id}" style="display:flex; align-items:center; justify-content:center; gap:4px;">
             <button class="btn-stock-quick" data-delta="-1" data-id="${p.id}" style="
@@ -184,6 +192,39 @@ async function cargarProductosDesdeFirestore() {
   }));
   renderEstadisticas(); 	
   renderTablaProductos(); 	
+}
+
+// ---------------------- FUNCIONALIDAD DE ACTUALIZACIÓN DE PRECIO RÁPIDO ----------------------
+async function actualizarPrecioRapidoPorInput(idProducto, nuevoValor) {
+    const prodEntry = productos.find(p => p.id === idProducto);
+    if (!prodEntry) return;
+
+    let nuevoPrecio = Number(nuevoValor);
+    if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
+        mostrarAlertaStock("Valor de precio inválido. Debe ser un número positivo.");
+        const inputEl = document.getElementById(`precio-input-${idProducto}`);
+        if(inputEl) inputEl.value = prodEntry.data.precio ?? 0;
+        return;
+    }
+    
+    nuevoPrecio = Math.round(nuevoPrecio);
+
+    try {
+        // 1. Actualizar en Firestore
+        await productosRef.doc(idProducto).update({ precio: nuevoPrecio });
+        
+        // 2. Actualizar la variable local
+        prodEntry.data.precio = nuevoPrecio; 
+        
+        // 3. Recalcular estadísticas del panel
+        renderEstadisticas();
+
+        console.log(`Precio de ${prodEntry.data.nombre} actualizado a $${nuevoPrecio}.`);
+        
+    } catch (err) {
+        console.error("Error actualizando precio por input:", err);
+        mostrarAlertaStock("Hubo un error al actualizar el precio.");
+    }
 }
 
 // ---------------------- FUNCIONALIDAD DE ACTUALIZACIÓN DE STOCK ----------------------
@@ -859,7 +900,7 @@ async function cargarHistorialVentas() {
 
     } catch (e) {
         console.error("Error cargando historial de ventas. Probablemente falte un índice de Firestore.", e);
-        listaCont.innerHTML = '<p style="color:var(--rojo);">Error al cargar o procesar el historial de ventas. Por favor, revisa la consola (F12) para ver si falta un **Índice de Firestore** en la colección `ventas` para el campo `fecha`.</p>';
+        listaCont.innerHTML = '<p style="color:#c62828;">Error al cargar o procesar el historial de ventas. Por favor, revisa la consola (F12) para ver si falta un **Índice de Firestore** en la colección `ventas` para el campo `fecha`.</p>';
     } finally {
         loader.style.display = 'none';
     }
@@ -878,7 +919,7 @@ function renderHistorialVentas(ventasPorDia) {
     fechasOrdenadas.forEach(fecha => {
         const dataDia = ventasPorDia[fecha];
         
-        // Validación adicional antes de renderizar
+        // Validation adicional antes de renderizar
         if (!dataDia || !dataDia.ventas || dataDia.ventas.length === 0) return;
         
         const fechaLegible = new Date(fecha + 'T00:00:00').toLocaleDateString('es-AR', { dateStyle: 'full' });
@@ -897,7 +938,7 @@ function renderHistorialVentas(ventasPorDia) {
                         <div class="item-detalle">
                             <span style="font-weight:700;">#${dataDia.ventas.length - index} |</span>
                             <span style="color:#777;">Final: ${formatearPrecio(venta.totalFinal || 0).replace(/\u00A0/g, ' ')}</span>
-                            ${(venta.montoDescuento || 0) > 0 ? `<span style="color:var(--rojo); font-weight:600;">(Dto: ${venta.porcentajeDescuento || 0}%)</span>` : ''}
+                            ${(venta.montoDescuento || 0) > 0 ? `<span style="color:#c62828; font-weight:600;">(Dto: ${venta.porcentajeDescuento || 0}%)</span>` : ''}
                         </div>
                         <div style="text-align:right;">
                             ${(venta.items || []).map(item => `
@@ -1203,7 +1244,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   
-  // NUEVO LISTENER: Escucha el cambio de valor en el input de stock
+  // ESCUCHA EL CAMBIO DE VALOR EN EL INPUT DE PRECIO
+  tbody.addEventListener("change", async (e) => {
+    if (e.target.classList.contains("precio-input-edit")) {
+      const id = e.target.dataset.id;
+      const nuevoValor = e.target.value;
+      await actualizarPrecioRapidoPorInput(id, nuevoValor);
+    }
+  });
+
+  // Escucha el cambio de valor en el input de stock
   tbody.addEventListener("change", async (e) => {
     if (e.target.classList.contains("stock-input-edit")) {
       const id = e.target.dataset.id;
