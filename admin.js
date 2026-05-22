@@ -195,7 +195,6 @@ function renderTablaProductos() {
     const tr = document.createElement("tr");
     if (estiloFila) tr.setAttribute("style", estiloFila.split('"')[1]); 
 
-    // FIX Y ACTUALIZACIÓN: Se incorporaron las clases de columnas correspondientes (col-sku, col-nombre, col-marca)
     tr.innerHTML = `
       <td class="col-sku" style="font-weight: 600; color: #555; font-family: monospace;">
         ${p.data.sku || "-"}
@@ -356,7 +355,7 @@ async function actualizarStockRapido(idProducto, delta) {
     }
 }
 
-// ---------------------- FUNCIONALIDAD VENTA RÁPIDA (POS) ----------------------
+// ---------------------- FUNCIONALIDAD VETA RÁPIDA (POS) ----------------------
 
 function mostrarAlertaStock(mensaje) {
     const alertaDiv = document.getElementById('venta-alerta-stock');
@@ -445,6 +444,7 @@ function aplicarDescuento() {
 
     let porcentaje = Number(inputDescuento.value) || 0;
     
+    // FIX DE VARIABLE EN INGLÉS SOLUCIONADO AQUÍ:
     if (porcentaje < 0 || porcentaje > 100) {
         mostrarAlertaStock("El descuento debe ser un porcentaje entre 0 y 100.");
         porcentaje = Math.min(100, Math.max(0, porcentaje)); 
@@ -473,11 +473,12 @@ function renderVentaPanel() {
     const montoDescuento = totalSinDescuento * (porcentajeDescuento / 100);
     const totalFinal = Math.max(0, totalSinDescuento - montoDescuento); 
 
+    if (!listaDiv) return; // Validación preventiva de renderizado
     listaDiv.innerHTML = '';
 
     if (ventaActual.length === 0) {
         listaDiv.innerHTML = '<p style="color:#777;">No hay productos en la venta.</p>';
-        btnConfirmar.disabled = true;
+        if (btnConfirmar) btnConfirmar.disabled = true;
     } else {
         ventaActual.forEach(item => {
             const subtotal = item.precio * item.cantidad;
@@ -492,12 +493,12 @@ function renderVentaPanel() {
             `;
             listaDiv.appendChild(div);
         });
-        btnConfirmar.disabled = false;
+        if (btnConfirmar) btnConfirmar.disabled = false;
     }
 
-    totalSinDtoSpan.textContent = formatearPrecio(totalSinDescuento).replace(/\u00A0/g, ' ');
-    descuentoAplicadoSpan.textContent = formatearPrecio(montoDescuento).replace(/\u00A0/g, ' ');
-    totalFinalSpan.textContent = formatearPrecio(totalFinal).replace(/\u00A0/g, ' ');
+    if (totalSinDtoSpan) totalSinDtoSpan.textContent = formatearPrecio(totalSinDescuento).replace(/\u00A0/g, ' ');
+    if (descuentoAplicadoSpan) descuentoAplicadoSpan.textContent = formatearPrecio(montoDescuento).replace(/\u00A0/g, ' ');
+    if (totalFinalSpan) totalFinalSpan.textContent = formatearPrecio(totalFinal).replace(/\u00A0/g, ' ');
 }
 
 function buscarProductoParaVenta(input) {
@@ -580,6 +581,7 @@ function renderVentaSuggestions(sugerencias) {
     const listaSugerencias = document.getElementById('venta-sugerencias-list');
     const inputEl = document.getElementById('venta-input-codbarra');
     
+    if (!listaSugerencias || !inputEl) return;
     if (!inputEl.value.trim() || sugerencias.length === 0) {
         listaSugerencias.classList.add('oculto');
         listaSugerencias.innerHTML = '';
@@ -1141,5 +1143,60 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   
+  // FIX CRÍTICO: Los listeners individuales del POS ahora apuntan a las funciones unificadas
+  if (btnApplyDiscount) btnApplyDiscount.addEventListener('click', aplicarDescuento);
+  if (btnQuitarDescuento) btnQuitarDescuento.addEventListener('click', quitarDescuento);
+  
+  if (inputDescuento) {
+    inputDescuento.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            aplicarDescuento();
+        }
+    });
+    inputDescuento.addEventListener('blur', aplicarDescuento);
+  }
+
+  if (ventaItemsList) {
+      ventaItemsList.addEventListener('click', (e) => {
+          if (e.target.classList.contains('btn-eliminar-venta-item')) {
+              const id = e.target.dataset.id;
+              if (id) eliminarItemVenta(id);
+          }
+      });
+  }
+
+  if (inputCodBarraVenta) {
+    inputCodBarraVenta.addEventListener('input', liveSearchVenta);
+    inputCodBarraVenta.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const codbarra = inputCodBarraVenta.value.trim();
+            if (!codbarra) return; 
+
+            const resultados = buscarProductoParaVenta(codbarra);
+            if (resultados.length === 1) {
+                agregarProductoEncontrado(resultados[0]); 
+                setTimeout(() => {
+                    inputCodBarraVenta.value = ''; 
+                    renderVentaSuggestions([]);
+                    inputCodBarraVenta.focus(); 
+                }, 50); 
+                return;
+            } 
+            if (resultados.length > 1) {
+                mostrarAlertaStock("Se encontraron múltiples coincidencias. Por favor, seleccione un producto de la lista.");
+                return;
+            }
+            inputCodBarraVenta.value = '';
+            renderVentaSuggestions([]);
+            return;
+        }
+    });
+    inputCodBarraVenta.addEventListener('blur', () => {
+         setTimeout(() => renderVentaSuggestions([]), 200);
+    });
+  }
+
   document.getElementById("btn-limpiar-form").addEventListener("click", () => limpiarFormulario());
 });
