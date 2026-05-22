@@ -262,17 +262,19 @@ function generarLinkWhatsAppCarrito() {
 
     const envio = obtenerEnvioSeleccionado();
     
-    let texto = "Hola Thor, quiero hacer este pedido:\n";
+    // Eliminamos todos los prompts de datos del cliente
+    let texto = "Hola, me interesa comprar este producto:\n";
     carrito.forEach(item => {
         const producto = obtenerProductoPorId(item.id);
         if (!producto) return;
         const subtotal = producto.precio * item.cantidad;
-        texto += `- ${item.cantidad} x ${producto.nombre} = ${formatearPrecio(subtotal)}\n`;
+        const marcaTexto = producto.marca ? ` (${producto.marca})` : ""; // Si tiene marca, la guarda entre paréntesis
+        texto += `- ${item.cantidad} x ${producto.nombre}${marcaTexto} = ${formatearPrecio(subtotal)}\n`;
     });
 
     texto += `\nTotal: ${formatearPrecio(calcularTotalCarrito())}\n`;
     texto += `Opción de envío: ${envio || "No especificado"}\n\n`;
-    texto += "Mis datos los confirmo por este chat."; 
+    texto += "Quiero coordinar para recibir/ retirar."; // Mensaje para que el cliente ingrese sus datos 
 
     const mensaje = encodeURIComponent(texto);
     return `https://wa.me/${NUMERO_WHATSAPP}?text=${mensaje}`; 
