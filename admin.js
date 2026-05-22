@@ -44,7 +44,7 @@ function limpiarFormulario() {
   document.getElementById("prod-id").value = "";
   document.getElementById("prod-nombre").value = "";
   document.getElementById("prod-marca").value = "";
-  document.getElementById("prod-costo").value = ""; // ACTUALIZACIÓN: Limpieza precio costo
+  document.getElementById("prod-costo").value = ""; 
   document.getElementById("prod-precio").value = "";
   document.getElementById("prod-stock").value = "";
   document.getElementById("prod-codbarra").value = ""; 
@@ -68,7 +68,7 @@ function cargarProductoEnFormulario(id, prod) {
   document.getElementById("prod-id").value = id;
   document.getElementById("prod-nombre").value = prod.nombre || "";
   document.getElementById("prod-marca").value = prod.marca || "";
-  document.getElementById("prod-costo").value = prod.costo || ""; // ACTUALIZACIÓN: Cargar precio costo
+  document.getElementById("prod-costo").value = prod.costo || ""; 
   document.getElementById("prod-precio").value = prod.precio || 0;
   document.getElementById("prod-stock").value = prod.stock || 0;
   document.getElementById("prod-codbarra").value = prod.codbarra || ""; 
@@ -173,13 +173,18 @@ function renderTablaProductos() {
   const lista = productosFiltrados();
 
   if (lista.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7">No se encontraron productos en esta vista.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8">No se encontraron productos en esta vista.</td></tr>`;
     return;
   }
 
   lista.forEach(p => {
     const stock = Number(p.data.stock) ?? 0;
+    const costo = Number(p.data.costo) ?? 0;
+    const precio = Number(p.data.precio) ?? 0;
     
+    // CÁLCULO DE LA NUEVA COLUMNA: Precio Venta - Precio Costo
+    const gananciaIndividual = precio - costo;
+
     let estiloFila = "";
     if (stock === 0) {
       estiloFila = 'style="background-color: #fce4e4;"'; 
@@ -190,7 +195,6 @@ function renderTablaProductos() {
     const tr = document.createElement("tr");
     if (estiloFila) tr.setAttribute("style", estiloFila.split('"')[1]); 
 
-    // ACTUALIZACIÓN: Se incorporó la columna inline del input rápido de Precio de Costo
     tr.innerHTML = `
       <td>
         ${p.data.nombre || "-"}
@@ -201,7 +205,7 @@ function renderTablaProductos() {
       <td>
         <div style="display:flex; align-items:center; gap:2px;">
           <span style="color:#777; font-size: 12px;">$</span>
-          <input type="number" id="costo-input-${p.id}" value="${p.data.costo ?? 0}" min="0" step="1" data-id="${p.id}"
+          <input type="number" id="costo-input-${p.id}" value="${costo}" min="0" step="1" data-id="${p.id}"
               style="width: 80px; border: 1px solid #ccc; border-radius: 4px; padding: 2px 4px; font-size: 13px; background-color: #fafafa;" 
               class="costo-input-edit"
           >
@@ -210,11 +214,14 @@ function renderTablaProductos() {
       <td>
         <div style="display:flex; align-items:center; gap:2px;">
           <span style="color:#555; font-weight:500;">$</span>
-          <input type="number" id="precio-input-${p.id}" value="${p.data.precio ?? 0}" min="0" step="1" data-id="${p.id}"
+          <input type="number" id="precio-input-${p.id}" value="${precio}" min="0" step="1" data-id="${p.id}"
               style="width: 85px; border: 1px solid #ccc; border-radius: 4px; padding: 2px 4px; font-size: 13px;" 
               class="precio-input-edit"
           >
         </div>
+      </td>
+      <td style="font-weight: 700; color: ${gananciaIndividual >= 0 ? '#2e7d32' : 'var(--rojo)'};">
+        ${formatearPrecio(gananciaIndividual)}
       </td>
       <td style="text-align: center;">
         <div class="stock-controls" data-id="${p.id}" style="display:flex; align-items:center; justify-content:center; gap:4px;">
@@ -252,7 +259,6 @@ async function cargarProductosDesdeFirestore() {
   renderTablaProductos(); 	
 }
 
-// NUEVA FUNCIÓN: Actualización rápida por teclado del costo inline en la fila
 async function actualizarCostoRapidoPorInput(idProducto, nuevoValor) {
     const prodEntry = productos.find(p => p.id === idProducto);
     if (!prodEntry) return;
@@ -269,7 +275,9 @@ async function actualizarCostoRapidoPorInput(idProducto, nuevoValor) {
     try {
         await productosRef.doc(idProducto).update({ costo: nuevoCosto });
         prodEntry.data.costo = nuevoCosto; 
-        console.log(`Costo de ${prodEntry.data.nombre} cambiado a $${nuevoCosto}.`);
+        
+        // MODIFICACIÓN: Forzar re-render para recalcular el saldo de ganancia visual al instante
+        renderTablaProductos();
     } catch (err) {
         console.error("Error actualizando costo rápido:", err);
     }
@@ -291,6 +299,9 @@ async function actualizarPrecioRapidoPorInput(idProducto, nuevoValor) {
     try {
         await productosRef.doc(idProducto).update({ precio: nuevoPrecio });
         prodEntry.data.precio = nuevoPrecio; 
+        
+        // MODIFICACIÓN: Forzar re-render de la tabla para recalcular ganancia en vivo
+        renderTablaProductos();
         renderEstadisticas();
     } catch (err) {
         console.error("Error actualizando precio por input:", err);
@@ -789,10 +800,11 @@ function generarPDFStock() {
         return nombreA.localeCompare(nombreB);
     });
 
-    const headers = [['Nombre', 'Marca', 'Precio', 'Stock']];
+    const headers = [['Nombre', 'Marca', 'Precio Costo', 'Precio Venta', 'Stock']];
     const data = productosOrdenados.map(p => [
         p.data.nombre || 'Sin nombre',
         p.data.marca || '-',
+        formatearPrecio(p.data.costo || 0),
         formatearPrecio(p.data.precio || 0),
         (p.data.stock === undefined || p.data.stock === null) ? '-' : p.data.stock.toString()
     ]);
@@ -813,8 +825,9 @@ function generarPDFStock() {
         styles: { fontSize: 10, cellPadding: 2 },
         headStyles: { fillColor: [255, 214, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
         columnStyles: {
-            2: { halign: 'right', cellWidth: 30 }, 
-            3: { halign: 'center' } 
+            2: { halign: 'right', cellWidth: 28 }, 
+            3: { halign: 'right', cellWidth: 28 }, 
+            4: { halign: 'center' } 
         },
         didDrawPage: function (data) {
             doc.setFontSize(8)
@@ -891,7 +904,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const id = document.getElementById("prod-id").value.trim();
     const nombre = document.getElementById("prod-nombre").value.trim();
     const marca = document.getElementById("prod-marca").value.trim();
-    const costo = Number(document.getElementById("prod-costo").value || 0); // ACTUALIZACIÓN: Recibir valor costo
+    const costo = Number(document.getElementById("prod-costo").value || 0); 
     const precio = Number(document.getElementById("prod-precio").value || 0);
     const stock = Number(document.getElementById("prod-stock").value || 0);
     const alimentacion = document.getElementById("prod-alimentacion").value;
@@ -913,7 +926,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const imagenPlaceholder = "https://via.placeholder.com/300x200?text=Producto";
     const imagenPrincipal = images.length > 0 ? images[0] : imagenPlaceholder;
 
-    // ACTUALIZACIÓN: Propiedad 'costo' integrada al objeto del payload de Firebase
     const producto = { nombre, marca, costo, precio, stock, alimentacion, codbarra, imagen: imagenPrincipal, imagenes: images, descripcion: description, opcionesEnvio, detalles };
 
     try {
@@ -932,7 +944,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Evento change de costo inline añadido
   tbody.addEventListener("change", async (e) => {
     if (e.target.classList.contains("costo-input-edit")) {
       const id = e.target.dataset.id;
