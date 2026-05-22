@@ -20,7 +20,7 @@ main {
 
 /* HEADER */
 .header {
-    background-color: #00B5E2; /* CAMBIO DE COLOR: Cian/Azul */ 
+    background-color: #ed0c0cc4; /* CAMBIO DE COLOR: Cian/Azul */ 
     padding: 15px 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     display: flex;
@@ -244,8 +244,8 @@ main {
 .btn-agregar {
     width: 100%;
     border: none;
-    background-color: #3483fa;
-    color: #fff;
+    background-color: #5297fe47;
+    color: #3775fb;
     padding: 8px 10px;
     border-radius: 4px;
     font-weight: 600;
@@ -255,13 +255,13 @@ main {
 }
 
 .btn-agregar:hover {
-    background-color: #2968c8;
+    background-color: #458fff83;
 }
 
 .btn-comprar-ahora {
     width: 100%;
     border: none;
-    background-color: #00a650;
+    background-color: #3777ff;
     color: #fff;
     padding: 8px 10px;
     border-radius: 4px;
@@ -272,7 +272,7 @@ main {
 }
 
 .btn-comprar-ahora:hover {
-    background-color: #008f4f;
+    background-color: #3853eec3;
 }
 
 /* Botón cuando el producto está agotado */

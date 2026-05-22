@@ -5,17 +5,13 @@ const COLECCION_VENTAS = "ventas";
 let productos = []; 		// [{id, data}]
 let filtroTexto = ""; 	  // texto del buscador
 let ventaActual = [];   // [{id: string, cantidad: number, precio: number, nombre: string}] 
-let porcentajeDescuento = 0; // Almacena el porcentaje (0-100)
-let myChartGanancia = null; // Para guardar la instancia del gráfico
+let porcentajeDescuento = 0; 
+let myChartGanancia = null; 
 let myChartProductos = null;
 let myChartTransacciones = null;
 
 function formatearPrecio(numero) {
-  // 1. Redondeamos el número a un entero.
   const numRedondeado = Math.round(Number(numero) || 0);
-  
-  // 2. Formateamos y reemplazamos TODOS los espacios por un espacio duro (\u00A0)
-  // para evitar que el precio se corte en el PDF y forzamos ancho en generarPDFStock.
   return numRedondeado.toLocaleString("es-AR", {
     style: "currency",
     currency: "ARS",
@@ -29,8 +25,8 @@ function limpiarFormulario() {
   document.getElementById("prod-marca").value = "";
   document.getElementById("prod-precio").value = "";
   document.getElementById("prod-stock").value = "";
-  document.getElementById("prod-codbarra").value = ""; // Limpiamos Código de Barras
-  document.getElementById("prod-alimentacion").value = "Otro"; // Valor por defecto
+  document.getElementById("prod-codbarra").value = ""; 
+  document.getElementById("prod-alimentacion").value = "Otro"; 
   document.getElementById("prod-imagen").value = "";
   document.getElementById("prod-descripcion").value = "";
   document.getElementById("prod-envios").value = "";
@@ -50,7 +46,7 @@ function cargarProductoEnFormulario(id, prod) {
   document.getElementById("prod-marca").value = prod.marca || "";
   document.getElementById("prod-precio").value = prod.precio || 0;
   document.getElementById("prod-stock").value = prod.stock || 0;
-  document.getElementById("prod-codbarra").value = prod.codbarra || ""; // Cargamos Código de Barras
+  document.getElementById("prod-codbarra").value = prod.codbarra || ""; 
   document.getElementById("prod-alimentacion").value = prod.alimentacion || "Otro";
   document.getElementById("prod-descripcion").value = prod.descripcion || "";
   document.getElementById("prod-envios").value = (prod.opcionesEnvio || []).join(", ");
@@ -78,21 +74,16 @@ function productosFiltrados() {
   if (!filtroTexto) return productos;
   const t = filtroTexto.toLowerCase().trim();
   
-  // 1. Normalizamos el texto de búsqueda y dividimos en palabras clave (AND logic)
   const tNormalizado = filtroTexto.replace(/[^a-zA-Z0-9\s]/g, "").toLowerCase();
   const keywords = tNormalizado.split(/\s+/).filter(k => k.length > 0);
 
   return productos.filter(p => {
     const d = p.data;
-    
-    // 2. Búsqueda de palabra clave: NOMBRE, MARCA y DESCRIPCIÓN (AND logic)
     const searchableText = (d.nombre || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
     const searchableTextLower = searchableText.toLowerCase();
 
-    // 3. Verifica que TODAS las palabras clave estén presentes en el texto buscable
     const keywordMatch = keywords.every(keyword => searchableTextLower.includes(keyword));
 
-    // 4. Búsqueda por código de barras (soporta múltiples códigos)
     const codigosGuardados = d.codbarra ? d.codbarra.split(',') : [];
     
     const codbarraMatch = codigosGuardados.some(cod => {
@@ -100,7 +91,7 @@ function productosFiltrados() {
         return codbarraGuardadoNormalizado.includes(tNormalizado);
     });
     
-    return keywordMatch || codbarraMatch; // Coincide si alguna de las dos búsquedas coincide
+    return keywordMatch || codbarraMatch; 
   });
 }
 
@@ -126,9 +117,20 @@ function renderEstadisticas() {
   const elAct = document.getElementById("stat-activos");
   const elAgo = document.getElementById("stat-agotados");
   const elVal = document.getElementById("stat-valor");
+  
   if (elTotal) elTotal.textContent = total;
   if (elAct) elAct.textContent = activos;
-  if (elAgo) elAgo.textContent = agotados;
+  
+  if (elAgo) {
+    elAgo.textContent = agotados;
+    if (agotados > 0) {
+      elAgo.style.color = "var(--rojo)";
+      elAgo.style.fontWeight = "800";
+    } else {
+      elAgo.style.color = "#222";
+      elAgo.style.fontWeight = "800";
+    }
+  }
   if (elVal) elVal.textContent = formatearPrecio(valorTotal);
 }
 /* ========================== */
@@ -145,9 +147,24 @@ function renderTablaProductos() {
   }
 
   lista.forEach(p => {
+    const stock = Number(p.data.stock) ?? 0;
+    
+    let estiloFila = "";
+    if (stock === 0) {
+      estiloFila = 'style="background-color: #fce4e4;"'; 
+    } else if (stock <= 2) {
+      estiloFila = 'style="background-color: #fff3e0;"'; 
+    }
+
     const tr = document.createElement("tr");
+    if (estiloFila) tr.setAttribute("style", estiloFila.split('"')[1]); 
+
     tr.innerHTML = `
-      <td>${p.data.nombre || "-"}</td>
+      <td>
+        ${p.data.nombre || "-"}
+        ${stock === 0 ? ' <span style="color:var(--rojo); font-weight:bold; font-size:11px;">[AGOTADO]</span>' : ''}
+        ${stock > 0 && stock <= 2 ? ' <span style="color:#e65100; font-weight:bold; font-size:11px;">[STOCK CRÍTICO]</span>' : ''}
+      </td>
       <td>${p.data.marca || "-"}</td>
       <td>
         <div style="display:flex; align-items:center; gap:2px;">
@@ -163,8 +180,8 @@ function renderTablaProductos() {
             <button class="btn-stock-quick" data-delta="-1" data-id="${p.id}" style="
                 padding: 1px 6px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer; border-radius: 4px; font-weight: bold;
             ">-</button>
-            <input type="number" id="stock-input-${p.id}" value="${p.data.stock ?? 0}" min="0" data-id="${p.id}"
-                style="width: 45px; text-align: center; border: 1px solid #ccc; border-radius: 4px; padding: 1px;" 
+            <input type="number" id="stock-input-${p.id}" value="${stock}" min="0" data-id="${p.id}"
+                style="width: 45px; text-align: center; border: 1px solid #ccc; border-radius: 4px; padding: 1px; font-weight: ${stock <= 2 ? 'bold' : 'normal'};" 
                 class="stock-input-edit"
             >
             <button class="btn-stock-quick" data-delta="+1" data-id="${p.id}" style="
@@ -194,7 +211,6 @@ async function cargarProductosDesdeFirestore() {
   renderTablaProductos(); 	
 }
 
-// ---------------------- FUNCIONALIDAD DE ACTUALIZACIÓN DE PRECIO RÁPIDO ----------------------
 async function actualizarPrecioRapidoPorInput(idProducto, nuevoValor) {
     const prodEntry = productos.find(p => p.id === idProducto);
     if (!prodEntry) return;
@@ -210,26 +226,15 @@ async function actualizarPrecioRapidoPorInput(idProducto, nuevoValor) {
     nuevoPrecio = Math.round(nuevoPrecio);
 
     try {
-        // 1. Actualizar en Firestore
         await productosRef.doc(idProducto).update({ precio: nuevoPrecio });
-        
-        // 2. Actualizar la variable local
         prodEntry.data.precio = nuevoPrecio; 
-        
-        // 3. Recalcular estadísticas del panel
         renderEstadisticas();
-
-        console.log(`Precio de ${prodEntry.data.nombre} actualizado a $${nuevoPrecio}.`);
-        
     } catch (err) {
         console.error("Error actualizando precio por input:", err);
         mostrarAlertaStock("Hubo un error al actualizar el precio.");
     }
 }
 
-// ---------------------- FUNCIONALIDAD DE ACTUALIZACIÓN DE STOCK ----------------------
-
-// NUEVA FUNCIÓN: Actualiza el stock cuando el usuario presiona Enter o cambia el campo
 async function actualizarStockRapidoPorInput(idProducto, nuevoValor) {
     const prodEntry = productos.find(p => p.id === idProducto);
     if (!prodEntry) return;
@@ -237,34 +242,24 @@ async function actualizarStockRapidoPorInput(idProducto, nuevoValor) {
     let nuevoStock = Number(nuevoValor);
     if (isNaN(nuevoStock) || nuevoStock < 0) {
         mostrarAlertaStock("Valor de stock inválido. Debe ser un número positivo.");
-        // Restablecer el valor en la UI
         const inputEl = document.getElementById(`stock-input-${idProducto}`);
         if(inputEl) inputEl.value = prodEntry.data.stock ?? 0;
         return;
     }
     
-    // Aseguramos que sea un entero (opcional, pero stock suele ser entero)
     nuevoStock = Math.round(nuevoStock);
 
     try {
-        // 1. Actualizar en Firestore
         await productosRef.doc(idProducto).update({ stock: nuevoStock });
-        
-        // 2. Actualizar la variable local 'productos'
         prodEntry.data.stock = nuevoStock; 
-        
-        // 3. Actualizar la UI (estadísticas)
+        renderTablaProductos();
         renderEstadisticas();
-
-        console.log(`Stock de ${prodEntry.data.nombre} actualizado a ${nuevoStock} por teclado.`);
-        
     } catch (err) {
         console.error("Error actualizando stock por input:", err);
         mostrarAlertaStock("Hubo un error al actualizar el stock.");
     }
 }
 
-// FUNCION EXISTENTE: Actualiza el stock por +/- botones
 async function actualizarStockRapido(idProducto, delta) {
     const prodEntry = productos.find(p => p.id === idProducto);
     if (!prodEntry) return;
@@ -278,35 +273,24 @@ async function actualizarStockRapido(idProducto, delta) {
     }
 
     try {
-        // 1. Actualizar en Firestore
         await productosRef.doc(idProducto).update({ stock: nuevoStock });
-        
-        // 2. Actualizar la variable local 'productos'
         prodEntry.data.stock = nuevoStock; 
-        
-        // 3. Actualizar la UI localmente (input y estadísticas)
-        const inputEl = document.getElementById(`stock-input-${idProducto}`);
-        if (inputEl) inputEl.value = nuevoStock; // Actualizamos el input
+        renderTablaProductos();
         renderEstadisticas();
-        
     } catch (err) {
         console.error("Error actualizando stock:", err);
         mostrarAlertaStock("Hubo un error al actualizar el stock.");
     }
 }
-// ---------------------------------------------------------------------------
 
+// ---------------------- FUNCIONALIDAD VENTA RÁPIDA (POS) ----------------------
 
-// ---------------------- FUNCIONALIDAD VENTA RÁPIDA (POS) - FUNCIONES GLOBALES ----------------------
-
-// FUNCIÓN CLAVE: Reemplaza el alert() nativo
 function mostrarAlertaStock(mensaje) {
     const alertaDiv = document.getElementById('venta-alerta-stock');
     const mensajeSpan = document.getElementById('venta-alerta-mensaje');
     const inputCodBarraVenta = document.getElementById('venta-input-codbarra');
     
     if (!alertaDiv || !mensajeSpan) {
-        // Fallback si el modal no existe (aunque no debería)
         alert(mensaje);
         return;
     }
@@ -315,23 +299,19 @@ function mostrarAlertaStock(mensaje) {
     alertaDiv.classList.remove('oculto');
     alertaDiv.style.display = 'flex';
     
-    // Aseguramos que al cerrar el modal, el foco regrese al input del escáner
     const cerrarAlerta = () => {
         alertaDiv.classList.add('oculto');
         alertaDiv.style.display = 'none';
         if (inputCodBarraVenta) inputCodBarraVenta.focus();
     };
 
-    // Listener para cerrar al hacer clic en el botón
     const btnCerrar = document.getElementById('btn-cerrar-alerta-stock');
     if (btnCerrar) {
-        // Clonamos el nodo para remover listeners antiguos y evitar cierres múltiples
         const newBtnCerrar = btnCerrar.cloneNode(true);
         btnCerrar.parentNode.replaceChild(newBtnCerrar, btnCerrar);
         newBtnCerrar.addEventListener('click', cerrarAlerta);
     }
     
-    // Listener para cerrar al presionar Enter o Escape
     const handleKey = (e) => {
         if (e.key === 'Enter' || e.key === 'Escape') {
             cerrarAlerta();
@@ -341,32 +321,28 @@ function mostrarAlertaStock(mensaje) {
     document.addEventListener('keydown', handleKey);
 }
 
-
 function vaciarVenta() {
     ventaActual = [];
-    porcentajeDescuento = 0; // Reinicia el porcentaje de descuento
+    porcentajeDescuento = 0; 
     const inputDescuento = document.getElementById('venta-input-descuento');
-    if (inputDescuento) inputDescuento.value = ''; // Limpia el input de descuento
+    if (inputDescuento) inputDescuento.value = ''; 
     renderVentaPanel();
-    renderVentaSuggestions([]); // Oculta sugerencias al vaciar
+    renderVentaSuggestions([]); 
 }
 
-// NUEVA FUNCIÓN: Eliminar un ítem individualmente
 function eliminarItemVenta(idProducto) {
     const confirmar = confirm("¿Estás seguro de que deseas eliminar este producto de la venta?");
     if (!confirmar) return;
     
-    // Filtramos la venta actual, dejando fuera el producto con el ID especificado
     ventaActual = ventaActual.filter(item => item.id !== idProducto);
     
-    // Si la venta queda vacía, quitamos el descuento automáticamente
     if (ventaActual.length === 0) {
         porcentajeDescuento = 0;
         const inputDescuento = document.getElementById('venta-input-descuento');
         if (inputDescuento) inputDescuento.value = '';
     }
 
-    renderVentaPanel(); // Volvemos a dibujar el panel y recalcular totales
+    renderVentaPanel(); 
 }
 
 function abrirVenta() {
@@ -390,17 +366,15 @@ function cerrarVenta() {
     if (buscadorAdmin) buscadorAdmin.focus();
 }
 
-// FUNCIÓN MODIFICADA: Aplica el descuento en porcentaje
 function aplicarDescuento() {
     const inputDescuento = document.getElementById('venta-input-descuento');
     if (!inputDescuento) return;
 
     let porcentaje = Number(inputDescuento.value) || 0;
     
-    // Validaciones
     if (porcentaje < 0 || porcentaje > 100) {
         mostrarAlertaStock("El descuento debe ser un porcentaje entre 0 y 100.");
-        porcentaje = Math.min(100, Math.max(0, porcentaje)); // Limita entre 0 y 100
+        porcentaje = Math.min(100, Math.max(0, porcentaje)); 
         inputDescuento.value = porcentaje;
     }
 
@@ -408,14 +382,12 @@ function aplicarDescuento() {
     renderVentaPanel();
 }
 
-// FUNCIÓN MODIFICADA: Quita el descuento
 function quitarDescuento() {
     const inputDescuento = document.getElementById('venta-input-descuento');
     if (inputDescuento) inputDescuento.value = '';
-    porcentajeDescuento = 0; // Reinicia el porcentaje
+    porcentajeDescuento = 0; 
     renderVentaPanel();
 }
-
 
 function renderVentaPanel() {
     const listaDiv = document.getElementById('venta-items-list');
@@ -425,8 +397,6 @@ function renderVentaPanel() {
     const btnConfirmar = document.getElementById('btn-confirmar-venta');
     
     const totalSinDescuento = ventaActual.reduce((total, item) => total + (item.precio * item.cantidad), 0);
-    
-    // CÁLCULO CLAVE PARA PORCENTAJE
     const montoDescuento = totalSinDescuento * (porcentajeDescuento / 100);
     const totalFinal = Math.max(0, totalSinDescuento - montoDescuento); 
 
@@ -452,26 +422,17 @@ function renderVentaPanel() {
         btnConfirmar.disabled = false;
     }
 
-    // Actualiza los displays de totales y descuento
     totalSinDtoSpan.textContent = formatearPrecio(totalSinDescuento).replace(/\u00A0/g, ' ');
     descuentoAplicadoSpan.textContent = formatearPrecio(montoDescuento).replace(/\u00A0/g, ' ');
     totalFinalSpan.textContent = formatearPrecio(totalFinal).replace(/\u00A0/g, ' ');
 }
 
-/**
- * Función central de búsqueda para el POS:
- * 1. Intenta encontrar por código de barras exacto (escáner).
- * 2. Si falla, intenta encontrar por palabra clave en Nombre/Marca.
- * @param {string} input Texto ingresado en el campo.
- * @returns {Array} Lista de productos encontrados.
- */
 function buscarProductoParaVenta(input) {
     if (!input) return [];
     
     const inputLower = input.toLowerCase().trim();
     const inputNormalizado = input.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 
-    // 1. Búsqueda por CÓDIGO DE BARRAS (Coincidencia exacta)
     const matchByBarcode = productos.find(p => {
         const codigosGuardados = p.data.codbarra ? p.data.codbarra.split(',') : [];
         return codigosGuardados.some(cod => {
@@ -479,37 +440,27 @@ function buscarProductoParaVenta(input) {
             return codbarraGuardadoNormalizado === inputNormalizado; 
         });
     });
-    if (matchByBarcode) return [matchByBarcode]; // Si hay coincidencia exacta de código, devuelve SOLO ESE.
+    if (matchByBarcode) return [matchByBarcode]; 
 
-    // 2. Búsqueda por PALABRA CLAVE (Nombre/Marca/Descripción)
     const keywords = inputLower.split(/\s+/).filter(k => k.length > 0);
     
     const matchesByKeyword = productos.filter(p => {
         const d = p.data;
         const searchableText = (d.nombre || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
         const searchableTextLower = searchableText.toLowerCase();
-
-        // Verifica que TODAS las palabras clave estén presentes (AND logic)
         const keywordMatch = keywords.every(keyword => searchableTextLower.includes(keyword));
-        
         return keywordMatch;
     });
 
     return matchesByKeyword; 
 }
 
-
-/**
- * Agrega un producto a la venta, asumiendo que se encontró por nombre o código.
- * @param {object} productoEnStock Objeto de producto {id, data}.
- */
 function agregarProductoEncontrado(productoEnStock) {
     const itemEnVenta = ventaActual.find(item => item.id === productoEnStock.id);
     const stockDisponible = Number(productoEnStock.data.stock) || 0;
     const cantidadActualVenta = itemEnVenta ? itemEnVenta.cantidad : 0;
 
     if (stockDisponible <= cantidadActualVenta) {
-        // USAMOS LA NUEVA FUNCIÓN PARA MANTENER LA ALERTA EN PANTALLA
         mostrarAlertaStock(`Stock agotado o insuficiente de "${productoEnStock.data.nombre}". Stock disponible: ${stockDisponible}.`);
         return;
     }
@@ -528,7 +479,6 @@ function agregarProductoEncontrado(productoEnStock) {
     renderVentaPanel();
 }
 
-// Función que maneja la entrada de texto del POS (se llama desde el listener 'input')
 function liveSearchVenta() {
     const inputEl = document.getElementById('venta-input-codbarra');
     const input = inputEl.value;
@@ -540,25 +490,20 @@ function liveSearchVenta() {
 
     const resultados = buscarProductoParaVenta(input);
     
-    // Si la búsqueda devuelve UN resultado por coincidencia exacta de código, agrégalo directamente.
-    // Esta lógica se mantiene para el escáner (disparo en 'input')
     if (resultados.length === 1 && resultados[0].data.codbarra && resultados[0].data.codbarra.includes(input)) {
          agregarProductoEncontrado(resultados[0]);
-         inputEl.value = ''; // Limpia inmediatamente
-         renderVentaSuggestions([]); // Oculta
+         inputEl.value = ''; 
+         renderVentaSuggestions([]); 
          return;
     }
     
-    // Si hay más de un resultado o la búsqueda es parcial por nombre, muestra la lista
-    renderVentaSuggestions(resultados.slice(0, 8)); // Muestra hasta 8 sugerencias
+    renderVentaSuggestions(resultados.slice(0, 8)); 
 }
 
-// Renderiza la lista de sugerencias clicables
 function renderVentaSuggestions(sugerencias) {
     const listaSugerencias = document.getElementById('venta-sugerencias-list');
     const inputEl = document.getElementById('venta-input-codbarra');
     
-    // Si el campo de búsqueda está vacío, no mostramos nada.
     if (!inputEl.value.trim() || sugerencias.length === 0) {
         listaSugerencias.classList.add('oculto');
         listaSugerencias.innerHTML = '';
@@ -570,7 +515,7 @@ function renderVentaSuggestions(sugerencias) {
     sugerencias.forEach(p => {
         const div = document.createElement('div');
         div.className = 'sugerencia-item';
-        div.dataset.id = p.id; // Almacenamos el ID para el click
+        div.dataset.id = p.id; 
         div.innerHTML = `
             <span>${p.data.nombre} (${p.data.marca || '-'})</span>
             <span style="font-weight: 600;">${formatearPrecio(p.data.precio)}</span>
@@ -582,17 +527,16 @@ function renderVentaSuggestions(sugerencias) {
             if (productoSeleccionado) {
                 agregarProductoEncontrado(productoSeleccionado);
                 const inputEl = document.getElementById('venta-input-codbarra');
-                inputEl.value = ''; // Limpia el campo después de la selección
-                inputEl.focus(); // Vuelve el foco para la próxima búsqueda/escaneo
+                inputEl.value = ''; 
+                inputEl.focus(); 
             }
-            renderVentaSuggestions([]); // Oculta la lista después de seleccionar
+            renderVentaSuggestions([]); 
         });
         listaSugerencias.appendChild(div);
     });
 
     listaSugerencias.classList.remove('oculto');
 }
-
 
 async function confirmarVenta() {
     if (ventaActual.length === 0) return;
@@ -601,7 +545,6 @@ async function confirmarVenta() {
         const updates = await db.runTransaction(async (transaction) => {
             const resultList = [];
             
-            // 1. PRIMERO: Realizar TODAS las lecturas
             const readPromises = ventaActual.map(item => {
                 const docRef = productosRef.doc(item.id);
                 return transaction.get(docRef);
@@ -609,7 +552,6 @@ async function confirmarVenta() {
             
             const docs = await Promise.all(readPromises);
 
-            // 2. SEGUNDO: Validar stock y realizar TODAS las escrituras
             for (let i = 0; i < ventaActual.length; i++) {
                 const item = ventaActual[i];
                 const doc = docs[i];
@@ -626,7 +568,6 @@ async function confirmarVenta() {
                     throw new Error(`Stock insuficiente para "${item.nombre}". Disponible: ${stockActual}, solicitado: ${item.cantidad}.`);
                 }
 
-                // Aplicar la actualización
                 transaction.update(doc.ref, { stock: nuevoStock });
                 resultList.push({ id: item.id, nuevoStock: nuevoStock });
             }
@@ -634,7 +575,6 @@ async function confirmarVenta() {
             return resultList;
         });
 
-        // Actualización exitosa en base de datos, ahora actualizamos la interfaz local
         updates.forEach(update => {
             const prodEntry = productos.find(p => p.id === update.id);
             if (prodEntry) prodEntry.data.stock = update.nuevoStock;
@@ -644,7 +584,6 @@ async function confirmarVenta() {
         const montoDescuento = totalSinDto * (porcentajeDescuento / 100);
         const totalFinalVenta = totalSinDto - montoDescuento;
 
-        // Registrar la venta en el historial
         const ventaData = {
             fecha: firebase.firestore.FieldValue.serverTimestamp(),
             fechaString: new Date().toISOString().split('T')[0],
@@ -674,14 +613,10 @@ async function confirmarVenta() {
         alert(`Error al confirmar la venta: ${error.message}`);
     }
 }
-// ---------------------------------------------------------------------------
 
+// ---------------------- HISTORIAL DE VENTAS Y GRÁFICOS ----------------------
 
-// ---------------------- FUNCIONALIDAD HISTORIAL DE VENTAS Y GRÁFICOS ----------------------
-
-// CRÍTICO: Se ha agregado manejo de errores para datos faltantes en ventas
 function procesarDatosParaGraficos(ventas) {
-    // Calcula las fechas para los últimos 7 días (0 = hoy, 6 = hace 6 días)
     const fechas = [];
     for (let i = 6; i >= 0; i--) {
         const d = new Date();
@@ -693,41 +628,32 @@ function procesarDatosParaGraficos(ventas) {
     const datosDiarios = {}; 
     const datosProductos = {}; 
 
-    // Inicializar datos para los 7 días
     fechas.forEach(fecha => {
         datosDiarios[fecha] = { ganancia: 0, transacciones: 0, ventas: [] };
     });
 
     ventas.forEach(venta => {
-        // Validación crucial de datos básicos
         if (!venta.fechaString) return; 
 
         const fecha = venta.fechaString;
         
-        // 1. Datos Diarios (Ganancia y Transacciones)
         if (datosDiarios[fecha]) {
             datosDiarios[fecha].ganancia += venta.totalFinal || 0;
             datosDiarios[fecha].transacciones += 1;
             datosDiarios[fecha].ventas.push(venta); 
         } else {
-            // Si la fecha es fuera del rango de 7 días (aunque la consulta lo debería evitar)
             return;
         }
 
-        // 2. Datos Productos
         if (venta.items && Array.isArray(venta.items)) {
             venta.items.forEach(item => {
-                // Validación de ítems
                 if (!item.nombre || item.cantidad === undefined) return;
-
                 const nombre = item.nombre;
                 const cantidad = item.cantidad || 0;
                 datosProductos[nombre] = (datosProductos[nombre] || 0) + cantidad;
             });
         }
     });
-
-    // --- Preparación de datos para Chart.js ---
     
     const etiquetasFecha = fechas.map(f => new Date(f + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' }));
     const valoresGanancia = fechas.map(f => datosDiarios[f].ganancia);
@@ -749,15 +675,12 @@ function procesarDatosParaGraficos(ventas) {
 }
 
 function dibujarGraficos(datos) {
-    // 1. Destruye instancias antiguas si existen
     if (myChartGanancia) myChartGanancia.destroy();
     if (myChartProductos) myChartProductos.destroy();
     if (myChartTransacciones) myChartTransacciones.destroy();
     
-    // Función de formato para tooltips (reemplaza espacio duro por espacio normal)
     const formatPriceTooltip = (value) => formatearPrecio(value).replace(/\u00A0/g, ' ');
 
-    // --- 1. GRÁFICO DE GANANCIA DIARIA (Ganancia en Pesos) ---
     const canvasGanancia = document.getElementById('grafico-ganancia-diaria');
     if (canvasGanancia) {
         const ctxGanancia = canvasGanancia.getContext('2d');
@@ -768,38 +691,33 @@ function dibujarGraficos(datos) {
                 datasets: [{
                     label: 'Ganancia Final (ARS)',
                     data: datos.ganancia.data,
-                    backgroundColor: 'rgba(0, 166, 80, 0.7)', // Verde
+                    backgroundColor: 'rgba(0, 166, 80, 0.7)', 
                     borderColor: 'rgba(0, 166, 80, 1)',
                     borderWidth: 1
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true, // Asegura que se adapte al contenedor
+                maintainAspectRatio: true,
                 scales: {
                     y: { 
                         beginAtZero: true, 
                         title: { display: true, text: 'Monto (ARS)' },
                         ticks: {
-                            callback: function(value) {
-                                return formatPriceTooltip(value);
-                            }
+                            callback: function(value) { return formatPriceTooltip(value); }
                         }
                     }
                 },
                 plugins: {
                     legend: { display: false },
                     tooltip: { 
-                        callbacks: { 
-                            label: (context) => `ARS ${formatPriceTooltip(context.parsed.y).replace('$', '')}` 
-                        } 
+                        callbacks: { label: (context) => `ARS ${formatPriceTooltip(context.parsed.y).replace('$', '')}` } 
                     }
                 }
             }
         });
     }
 
-    // --- 2. GRÁFICO DE PRODUCTOS VENDIDOS (Top 5) ---
     const canvasProductos = document.getElementById('grafico-productos-vendidos');
     if (canvasProductos) {
         const ctxProductos = canvasProductos.getContext('2d');
@@ -810,7 +728,7 @@ function dibujarGraficos(datos) {
                 datasets: [{
                     label: 'Cantidad Vendida',
                     data: datos.productos.data,
-                    backgroundColor: ['#1976d2', '#ffd600', '#c62828', '#2e7d32', '#9c27b0'], // Colores corporativos y otros
+                    backgroundColor: ['#1976d2', '#ffd600', '#c62828', '#2e7d32', '#9c27b0'], 
                     hoverOffset: 4
                 }]
             },
@@ -825,7 +743,6 @@ function dibujarGraficos(datos) {
         });
     }
 
-    // --- 3. GRÁFICO DE TRANSACCIONES DIARIAS (Transacciones) ---
     const canvasTransacciones = document.getElementById('grafico-transacciones-diarias');
     if (canvasTransacciones) {
         const ctxTransacciones = canvasTransacciones.getContext('2d');
@@ -836,7 +753,7 @@ function dibujarGraficos(datos) {
                 datasets: [{
                     label: 'Transacciones',
                     data: datos.transacciones.data,
-                    backgroundColor: 'rgba(25, 118, 210, 0.2)', // Azul claro
+                    backgroundColor: 'rgba(25, 118, 210, 0.2)', 
                     borderColor: 'rgba(25, 118, 210, 1)',
                     borderWidth: 2,
                     tension: 0.4,
@@ -857,7 +774,6 @@ function dibujarGraficos(datos) {
     }
 }
 
-
 async function cargarHistorialVentas() {
     const listaCont = document.getElementById('historial-ventas-list');
     const loader = document.getElementById('historial-loader');
@@ -866,41 +782,29 @@ async function cargarHistorialVentas() {
     loader.style.display = 'block';
 
     try {
-        // --- CÁLCULO DE RANGO DE FECHAS (ÚLTIMOS 7 DÍAS) ---
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0); 
-        
         const haceSieteDias = new Date(hoy);
-        haceSieteDias.setDate(hoy.getDate() - 7); // Inicio hace 7 días (00:00:00)
-        
+        haceSieteDias.setDate(hoy.getDate() - 7); 
         const timestampLimite = firebase.firestore.Timestamp.fromDate(haceSieteDias);
-        // --- FIN CÁLCULO DE RANGO DE FECHAS ---
 
-        // 1. Consultar ventas: solo las que ocurrieron a partir del inicio de "hace 7 días"
-        // Requiere un índice de Firestore en el campo 'fecha'
         const snapshot = await db.collection(COLECCION_VENTAS)
             .where('fecha', '>=', timestampLimite)
             .get(); 
         
         const ventas = snapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter(venta => venta.fechaString); // Solo procesar si tiene fechaString
+            .filter(venta => venta.fechaString); 
         
-        // Ordenamos en el cliente para asegurar el orden cronológico
         ventas.sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
 
-        // 2. Procesar datos para la lista y los gráficos
         const datosProcesados = procesarDatosParaGraficos(ventas);
-
-        // 3. Dibujar los gráficos
         dibujarGraficos(datosProcesados);
-        
-        // 4. Renderizar el detalle por día (usando las ventas agrupadas del procesamiento)
         renderHistorialVentas(datosProcesados.ventasPorDia);
 
     } catch (e) {
-        console.error("Error cargando historial de ventas. Probablemente falte un índice de Firestore.", e);
-        listaCont.innerHTML = '<p style="color:#c62828;">Error al cargar o procesar el historial de ventas. Por favor, revisa la consola (F12) para ver si falta un **Índice de Firestore** en la colección `ventas` para el campo `fecha`.</p>';
+        console.error("Error cargando historial de ventas.", e);
+        listaCont.innerHTML = '<p style="color:#c62828;">Error al cargar o procesar el historial de ventas.</p>';
     } finally {
         loader.style.display = 'none';
     }
@@ -908,7 +812,6 @@ async function cargarHistorialVentas() {
 
 function renderHistorialVentas(ventasPorDia) {
     const listaCont = document.getElementById('historial-ventas-list');
-    // Ordenamos las fechas de forma descendente (más nueva primero)
     const fechasOrdenadas = Object.keys(ventasPorDia).sort((a, b) => b.localeCompare(a)); 
 
     if (fechasOrdenadas.length === 0) {
@@ -918,8 +821,6 @@ function renderHistorialVentas(ventasPorDia) {
 
     fechasOrdenadas.forEach(fecha => {
         const dataDia = ventasPorDia[fecha];
-        
-        // Validation adicional antes de renderizar
         if (!dataDia || !dataDia.ventas || dataDia.ventas.length === 0) return;
         
         const fechaLegible = new Date(fecha + 'T00:00:00').toLocaleDateString('es-AR', { dateStyle: 'full' });
@@ -953,22 +854,15 @@ function renderHistorialVentas(ventasPorDia) {
     });
 }
 
-
 // ---------------------- GENERACIÓN DE PDF ----------------------
 function generarPDFStock() {
-    // 1. Ordenamos los productos por nombre
     const productosOrdenados = productos.slice().sort((a, b) => {
         const nombreA = a.data.nombre || "";
         const nombreB = b.data.nombre || "";
         return nombreA.localeCompare(nombreB);
     });
 
-    // 2. Encabezados de la tabla para el PDF
-    const headers = [
-        ['Nombre', 'Marca', 'Precio', 'Stock']
-    ];
-    
-    // 3. Mapeamos los datos para autoTable
+    const headers = [['Nombre', 'Marca', 'Precio', 'Stock']];
     const data = productosOrdenados.map(p => [
         p.data.nombre || 'Sin nombre',
         p.data.marca || '-',
@@ -976,20 +870,16 @@ function generarPDFStock() {
         (p.data.stock === undefined || p.data.stock === null) ? '-' : p.data.stock.toString()
     ]);
 
-    // 4. Inicializamos jsPDF (usando el objeto global window.jspdf)
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // 5. Título y Fecha
     doc.setFontSize(18);
     doc.text("Reporte de Stock - Thor Herramientas", 14, 20);
-    
     doc.setFontSize(10);
     doc.text(`Generado el: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 14, 26);
     
-    // 6. Generamos la tabla
     doc.autoTable({
-        startY: 30, // Posición inicial de la tabla
+        startY: 30, 
         head: headers,
         body: data,
         theme: 'striped',
@@ -1000,17 +890,14 @@ function generarPDFStock() {
             3: { halign: 'center' } 
         },
         didDrawPage: function (data) {
-            // Footer (Número de página)
             doc.setFontSize(8)
             let pageCount = doc.internal.getNumberOfPages()
             doc.text('Página ' + data.pageNumber + ' de ' + pageCount, data.settings.margin.left, doc.internal.pageSize.height - 10)
         }
     });
 
-    // 7. Descargar el archivo
     doc.save(`Stock_ThorHerramientas_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
-
 
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("form-producto");
@@ -1018,37 +905,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const inputBuscador = document.getElementById("buscador-admin");
   const btnDescargarPDF = document.getElementById("btn-descargar-stock-pdf"); 
   
-  // NUEVOS BOTONES DE VENTA
   const btnRealizarVenta = document.getElementById('btn-realizar-venta');
   const inputCodBarraVenta = document.getElementById('venta-input-codbarra');
   const btnVaciarVenta = document.getElementById('btn-vaciar-venta');
   const btnConfirmarVenta = document.getElementById('btn-confirmar-venta');
   
-  // NUEVOS CONTROLES DE DESCUENTO
   const inputDescuento = document.getElementById('venta-input-descuento');
-  const btnAplicarDescuento = document.getElementById('btn-aplicar-descuento');
+  const btnApplyDiscount = document.getElementById('btn-aplicar-descuento');
   const btnQuitarDescuento = document.getElementById('btn-quitar-descuento');
   
-  // BOTONES DE NAVEGACIÓN
   const btnShowProductos = document.getElementById('btn-show-productos');
   const btnShowHistorial = document.getElementById('btn-show-historial');
   
-  // Cargar productos
   cargarProductosDesdeFirestore().catch(err => {
     console.error("Error cargando productos:", err);
     alert("Hubo un problema cargando los productos.");
   });
   
-  // Asignar evento al botón de descarga de PDF
-  if (btnDescargarPDF) {
-      btnDescargarPDF.addEventListener("click", generarPDFStock);
-  }
-
-  // BOTONES DE NAVEGACIÓN (Escuchadores)
+  if (btnDescargarPDF) btnDescargarPDF.addEventListener("click", generarPDFStock);
   if (btnShowProductos) btnShowProductos.addEventListener('click', () => mostrarPanel('productos'));
   if (btnShowHistorial) btnShowHistorial.addEventListener('click', () => mostrarPanel('historial'));
 
-  // Buscar en vivo (Tabla de productos principal)
   if (inputBuscador) {
     inputBuscador.addEventListener("input", () => {
       filtroTexto = inputBuscador.value.trim();
@@ -1056,9 +933,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // **********************************************
-  // Lógica del Formulario de Productos (GUARDAR/EDITAR)
-  // **********************************************
   form.addEventListener("submit", async (e) => {
     e.preventDefault(); 
 
@@ -1068,9 +942,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const precio = Number(document.getElementById("prod-precio").value || 0);
     const stock = Number(document.getElementById("prod-stock").value || 0);
     const alimentacion = document.getElementById("prod-alimentacion").value;
-    const codbarra = document.getElementById("prod-codbarra").value.trim(); // Campo Código de Barras
+    const codbarra = document.getElementById("prod-codbarra").value.trim(); 
     const imagenTexto = document.getElementById("prod-imagen").value.trim();
-    const descripcion = document.getElementById("prod-descripcion").value.trim();
+    const description = document.getElementById("prod-descripcion").value.trim();
     const enviosText = document.getElementById("prod-envios").value;
     const detallesText = document.getElementById("prod-detalles").value;
 
@@ -1082,106 +956,64 @@ document.addEventListener("DOMContentLoaded", () => {
     const opcionesEnvio = enviosText.split(",").map(t => t.trim()).filter(Boolean);
     const detalles = detallesText.split("\n").map(t => t.trim()).filter(Boolean);
 
-    const imagenes = imagenTexto
-      ? imagenTexto.split(",").map(u => u.trim()).filter(Boolean)
-      : [];
+    const imagenes = imagenTexto ? imagenTexto.split(",").map(u => u.trim()).filter(Boolean) : [];
     const imagenPlaceholder = "https://via.placeholder.com/300x200?text=Producto";
     const imagenPrincipal = imagenes.length > 0 ? imagenes[0] : imagenPlaceholder;
 
-    const producto = {
-      nombre,
-      marca,
-      precio,
-      stock,
-      alimentacion, 
-      codbarra, // Campo Código de Barras
-      imagen: imagenPrincipal,
-      imagenes,
-      descripcion,
-      opcionesEnvio,
-      detalles
-    };
+    const producto = { nombre, marca, precio, stock, alimentacion, codbarra, imagen: imagenPrincipal, imagenes, description, opcionesEnvio, detalles };
 
     try {
       if (id) {
-        // Lógica de EDICIÓN (UPDATE)
         await productosRef.doc(id).update(producto);
         alert("Producto actualizado correctamente.");
       } else {
-        // Lógica de CREACIÓN (ADD)
         await productosRef.add(producto);
         alert("Producto creado correctamente.");
       }
-      
       limpiarFormulario();
-      await cargarProductosDesdeFirestore(); // Recarga la lista para ver el cambio
-      
+      await cargarProductosDesdeFirestore(); 
     } catch (err) {
       console.error("Error guardando producto:", err);
       alert("Hubo un error guardando el producto.");
     }
   });
 
-  // ------------- LISTENERS VENTA RÁPIDA -------------
   if (btnRealizarVenta) btnRealizarVenta.addEventListener('click', abrirVenta);
   if (btnVaciarVenta) btnVaciarVenta.addEventListener('click', vaciarVenta);
   if (btnConfirmarVenta) btnConfirmarVenta.addEventListener('click', confirmarVenta);
 
-  // LISTENER DE AUTOSUGERENCIAS
   if (inputCodBarraVenta) {
-    // 1. Manejo del input (escribir) - Muestra sugerencias en tiempo real
     inputCodBarraVenta.addEventListener('input', liveSearchVenta);
-    
-    // 2. Manejo de Enter (Escáner o búsqueda manual final)
     inputCodBarraVenta.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
             const codbarra = inputCodBarraVenta.value.trim();
-            
-            // Si el campo está vacío, ignoramos la pulsación de Enter.
             if (!codbarra) return; 
 
-            // Buscamos resultados utilizando la función que prioriza CÓDIGO EXACTO.
             const resultados = buscarProductoParaVenta(codbarra);
-            
             if (resultados.length === 1) {
-                // Caso ideal: Coincidencia única y exacta (escaneo exitoso)
                 agregarProductoEncontrado(resultados[0]); 
-                
-                // Retrasamos la limpieza para asegurar que todos los eventos se completen 
-                // (incluida la alerta de stock, si se dispara dentro de agregarProductoEncontrado).
                 setTimeout(() => {
                     inputCodBarraVenta.value = ''; 
                     renderVentaSuggestions([]);
-                    // Mantenemos el foco en el input del escáner (si no está en el modal de alerta)
                     inputCodBarraVenta.focus(); 
                 }, 50); 
-                
                 return;
             } 
-            
             if (resultados.length > 1) {
-                // Caso: Coincidencia múltiple (por nombre parcial).
                 mostrarAlertaStock("Se encontraron múltiples coincidencias. Por favor, seleccione un producto de la lista.");
                 return;
             }
-            
-            // Si resultados.length === 0 (No encontró): Limpia el input y resetea sugerencias.
             inputCodBarraVenta.value = '';
             renderVentaSuggestions([]);
             return;
-            
         }
     });
-    
-    // 3. Ocultar sugerencias al perder el foco (con retraso para permitir el clic)
     inputCodBarraVenta.addEventListener('blur', () => {
-         // Se añade un pequeño retraso para permitir que el evento 'click' en la sugerencia se dispare primero.
          setTimeout(() => renderVentaSuggestions([]), 200);
     });
   }
 
-  // NUEVO LISTENER: Escucha clics en la lista de items de venta para eliminar
   const ventaItemsList = document.getElementById('venta-items-list');
   if (ventaItemsList) {
       ventaItemsList.addEventListener('click', (e) => {
@@ -1192,12 +1024,10 @@ document.addEventListener("DOMContentLoaded", () => {
       });
   }
 
-  // LISTENERS DE DESCUENTO
-  if (btnAplicarDescuento) btnAplicarDescuento.addEventListener('click', aplicarDescuento);
+  if (btnApplyDiscount) btnApplyDiscount.addEventListener('click', aplicarDescuento);
   if (btnQuitarDescuento) btnQuitarDescuento.addEventListener('click', quitarDescuento);
   
   if (inputDescuento) {
-    // Aplicar descuento al presionar Enter o perder el foco
     inputDescuento.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -1207,20 +1037,15 @@ document.addEventListener("DOMContentLoaded", () => {
     inputDescuento.addEventListener('blur', aplicarDescuento);
   }
 
-  
-  // Escucha los clics en la tabla para +/- y Editar/Eliminar
   tbody.addEventListener("click", async (e) => {
     const accion = e.target.dataset.accion;
     const id = e.target.dataset.id;
-    const delta = e.target.dataset.delta; // Para los botones de stock
+    const delta = e.target.dataset.delta; 
     
     if (!id) return;
 
     if (e.target.classList.contains("btn-stock-quick")) {
-        // Lógica de STOCK RÁPIDO (+ / -)
-        if (delta) {
-            await actualizarStockRapido(id, Number(delta));
-        }
+        if (delta) await actualizarStockRapido(id, Number(delta));
         return;
     }
 
@@ -1235,16 +1060,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!confirmar) return;
       try {
         await productosRef.doc(id).delete();
-        await cargarProductosDesdeFirestore(); // refresca lista + estadísticas
+        await cargarProductosDesdeFirestore(); 
         alert("Producto eliminado.");
       } catch (err) {
-        console.error("Error eliminando producto:", err);
+        console.error("Error de eliminación:", err);
         alert("No se pudo eliminar el producto.");
       }
     }
   });
   
-  // ESCUCHA EL CAMBIO DE VALOR EN EL INPUT DE PRECIO
   tbody.addEventListener("change", async (e) => {
     if (e.target.classList.contains("precio-input-edit")) {
       const id = e.target.dataset.id;
@@ -1253,7 +1077,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Escucha el cambio de valor en el input de stock
   tbody.addEventListener("change", async (e) => {
     if (e.target.classList.contains("stock-input-edit")) {
       const id = e.target.dataset.id;
@@ -1262,6 +1085,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   
-  // Limpiar formulario al hacer clic en el botón
   document.getElementById("btn-limpiar-form").addEventListener("click", () => limpiarFormulario());
 });

@@ -37,10 +37,8 @@ function obtenerImagenesProducto(producto) {
 // NUEVA FUNCIÓN: Asegura que la URL de la imagen sea absoluta
 function makeAbsoluteUrl(url) {
     if (!url || url.startsWith('http://') || url.startsWith('https://')) {
-        return url; // Ya es absoluta
+        return url; 
     }
-    // Si la URL es relativa, le anteponemos la URL base actual.
-    // Usamos split('?')[0] para evitar anexar el path al parámetro ?producto=...
     const baseUrl = window.location.href.split('?')[0];
     const path = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1);
     return path + url;
@@ -64,19 +62,12 @@ function updateURLForProduct(id) {
     history.pushState({ producto: id }, "", url);
 }
 
-function clearProductFromURL() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("producto");
-    history.pushState({}, "", url.toString());
-}
-
-// ---------------------- Open Graph Meta Tags (MODIFICADA) ----------------------
+// ---------------------- Open Graph Meta Tags ----------------------
 
 function actualizarMetaTagsProducto(producto) {
-    // Valores por defecto
     const defaultTitle = "Thor Herramientas - Tu pasión, nuestra potencia";
     const defaultDescription = "Encontrá herramientas profesionales de calidad para talleres y construcción.";
-    const defaultImage = "https://via.placeholder.com/600x400?text=Thor+Herramientas+Logo"; // Usar el mismo que en HTML
+    const defaultImage = "https://via.placeholder.com/600x400?text=Thor+Herramientas+Logo"; 
     
     let title, description, image, url;
 
@@ -85,7 +76,6 @@ function actualizarMetaTagsProducto(producto) {
         const imagenPrincipal = imagenes[0];
         
         title = producto.nombre + ' | Thor Herramientas';
-        // Descuento: Incluir precio y stock de forma destacada en la descripción para la vista previa
         description = `Precio: ${formatearPrecio(producto.precio)}. Stock: ${producto.stock}. ${producto.descripcion || ''}`; 
         image = makeAbsoluteUrl(imagenPrincipal); 
         url = buildProductURL(producto.id);
@@ -96,10 +86,8 @@ function actualizarMetaTagsProducto(producto) {
         url = window.location.origin + window.location.pathname;
     }
 
-    // Actualiza las meta tags
     document.title = title;
     
-    // Función auxiliar para actualizar meta tags por propiedad
     const setMetaContent = (property, content) => {
         const tag = document.querySelector(`meta[property="${property}"]`);
         if (tag) tag.setAttribute('content', content);
@@ -110,8 +98,6 @@ function actualizarMetaTagsProducto(producto) {
     setMetaContent('og:image', image);
     setMetaContent('og:url', url);
 }
-// ----------------------------------------------------------------------------------
-
 
 // ---------------------- FIRESTORE ----------------------
 
@@ -268,7 +254,6 @@ function obtenerEnvioSeleccionado() {
     return select.value;
 }
 
-// FUNCIÓN DE WHATSAPP SIMPLIFICADA (SIN PROMPTS)
 function generarLinkWhatsAppCarrito() {
     if (carrito.length === 0) {
         alert("La lista de compras está vacía.");
@@ -277,7 +262,6 @@ function generarLinkWhatsAppCarrito() {
 
     const envio = obtenerEnvioSeleccionado();
     
-    // Eliminamos todos los prompts de datos del cliente
     let texto = "Hola Thor, quiero hacer este pedido:\n";
     carrito.forEach(item => {
         const producto = obtenerProductoPorId(item.id);
@@ -288,10 +272,9 @@ function generarLinkWhatsAppCarrito() {
 
     texto += `\nTotal: ${formatearPrecio(calcularTotalCarrito())}\n`;
     texto += `Opción de envío: ${envio || "No especificado"}\n\n`;
-    texto += "Mis datos los confirmo por este chat."; // Mensaje para que el cliente ingrese sus datos
+    texto += "Mis datos los confirmo por este chat."; 
 
     const mensaje = encodeURIComponent(texto);
-    // Lo lleva directamente a WhatsApp con el mensaje pre-cargado
     return `https://wa.me/${NUMERO_WHATSAPP}?text=${mensaje}`; 
 }
 
@@ -324,15 +307,13 @@ function renderProductos(lista) {
     contenedor.innerHTML = "";
 
     if (lista.length === 0) {
-        contenedor.innerHTML = "<p>No se encontraron productos.</p>";
+        contenedor.innerHTML = "<p>No se encontraron productos disponibles.</p>";
         return;
     }
 
     lista.forEach(producto => {
         const agotado = producto.stock <= 0;
-        // INICIO DEL CAMBIO: Usar la propiedad 'alimentacion'
         const textoAlimentacion = producto.alimentacion || "Tipo Desconocido"; 
-        // FIN DEL CAMBIO
         const imagenes = obtenerImagenesProducto(producto);
         const imagenPrincipal = imagenes[0];
 
@@ -347,7 +328,9 @@ function renderProductos(lista) {
             botonesHTML = `
                 <div class="btn-agregar-contenedor">
                     <div class="acciones-producto">
-                        <button class="btn-agregar" data-id="${producto.id}">Agregar a mi lista</button> <button class="btn-comprar-ahora" data-id="${producto.id}">Quiero este artículo</button> </div>
+                        <button class="btn-agregar" data-id="${producto.id}">Agregar a mi lista</button> 
+                        <button class="btn-comprar-ahora" data-id="${producto.id}">Comprar ahora</button> 
+                    </div>
                 </div>
             `;
         }
@@ -375,34 +358,28 @@ function renderProductos(lista) {
 function aplicarFiltros() {
     const textoInput = document.getElementById("buscador");
     const filtroMarca = document.getElementById("filtro-marca");
-    // INICIO DEL CAMBIO: Usar el ID correcto del filtro de alimentación
     const filtroAlimentacion = document.getElementById("filtro-alimentacion"); 
-    // FIN DEL CAMBIO
     const ordenPrecio = document.getElementById("orden-precio");
 
     const texto = textoInput ? textoInput.value.toLowerCase().trim() : "";
     const marca = filtroMarca ? filtroMarca.value : "todas";
     
-    // 1. Normalizamos el texto de búsqueda y dividimos en palabras clave (AND logic)
     const tNormalizado = texto.replace(/[^a-zA-Z0-9\s]/g, "").toLowerCase();
     const keywords = tNormalizado.split(/\s+/).filter(k => k.length > 0);
-
-    // INICIO DEL CAMBIO: Usar el valor del filtro de alimentación
     const filtroAlimentacionValue = filtroAlimentacion ? filtroAlimentacion.value : "todos"; 
-    // FIN DEL CAMBIO
     const orden = ordenPrecio ? ordenPrecio.value : "default";
 
     let filtrados = productos.filter(p => {
-        const d = p; // p es el objeto producto
+        const d = p; 
         
-        // 2. Búsqueda de palabra clave: NOMBRE, MARCA y DESCRIPCIÓN (AND logic)
+        // FILTRO CRÍTICO: Si no hay stock, queda afuera de todo render en index.html
+        if (Number(d.stock) <= 0) return false;
+
         const searchableText = (d.nombre || '') + ' ' + (d.descripcion || '') + ' ' + (d.marca || '');
         const searchableTextLower = searchableText.toLowerCase();
 
-        // 3. Verifica que TODAS las palabras clave estén presentes en el texto buscable
         const keywordMatch = keywords.every(keyword => searchableTextLower.includes(keyword));
         
-        // 4. Búsqueda por código de barras (normalizado) - si el texto es un posible código
         const codigosGuardados = d.codbarra ? d.codbarra.split(',') : [];
         const codbarraMatch = codigosGuardados.some(cod => {
             const codbarraGuardadoNormalizado = cod.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
@@ -410,16 +387,8 @@ function aplicarFiltros() {
         });
 
         const coincideTexto = keywordMatch || codbarraMatch;
-
-
         const coincideMarca = marca === "todas" ? true : p.marca === marca;
-
-        // INICIO DEL CAMBIO: Nueva lógica de filtrado por la propiedad 'alimentacion'
-        const coincideAlimentacion =
-            filtroAlimentacionValue === "todos"
-                ? true
-                : (p.alimentacion === filtroAlimentacionValue); 
-        // FIN DEL CAMBIO
+        const coincideAlimentacion = filtroAlimentacionValue === "todos" ? true : (p.alimentacion === filtroAlimentacionValue); 
 
         return coincideTexto && coincideMarca && coincideAlimentacion;
     });
@@ -433,13 +402,12 @@ function aplicarFiltros() {
     renderProductos(filtrados);
 }
 
-// ---------------------- DETALLE PRODUCTO (deep-link + compartir + ampliar imagen) -----------------
+// ---------------------- DETALLE PRODUCTO -----------------
 
 function abrirDetalleProducto(idProducto) {
     const producto = obtenerProductoPorId(idProducto);
     if (!producto) return;
     
-    // Al abrir el detalle, actualizamos las meta tags para la URL actual
     actualizarMetaTagsProducto(producto); 
 
     const panel = document.getElementById("detalle-panel");
@@ -447,9 +415,7 @@ function abrirDetalleProducto(idProducto) {
     if (!panel || !backdrop) return;
 
     const agotado = producto.stock <= 0;
-    // INICIO DEL CAMBIO: Usar la propiedad 'alimentacion'
     const textoAlimentacion = producto.alimentacion || "Tipo Desconocido"; 
-    // FIN DEL CAMBIO
     const imagenes = obtenerImagenesProducto(producto);
 
     let botonesHTML;
@@ -458,7 +424,9 @@ function abrirDetalleProducto(idProducto) {
     } else {
         botonesHTML = `
             <div class="detalle-botones">
-                <button class="btn-agregar" data-id="${producto.id}">Agregar a mi lista</button> <button class="btn-comprar-ahora" data-id="${producto.id}">Quiero este artículo</button> </div>
+                <button class="btn-agregar" data-id="${producto.id}">Agregar a mi lista</button> 
+                <button class="btn-comprar-ahora" data-id="${producto.id}">Quiero este artículo</button> 
+            </div>
         `;
     }
 
@@ -493,7 +461,7 @@ function abrirDetalleProducto(idProducto) {
                     <p class="detalle-descripcion">${producto.descripcion || ""}</p>
                     <p><strong>Marca:</strong> ${producto.marca || "-"} · Alimentación: ${textoAlimentacion}</p>
                     ${
-                        (producto.codbarra) ? `<p><strong>Código de Barras:</strong> ${producto.codbarra}</p>` : "" // <-- NUEVO: Mostramos Código de Barras
+                        (producto.codbarra) ? `<p><strong>Código de Barras:</strong> ${producto.codbarra}</p>` : ""
                     }
                     ${
                         (producto.detalles && producto.detalles.length > 0)
@@ -515,17 +483,14 @@ function abrirDetalleProducto(idProducto) {
     panel.classList.remove("oculto");
     backdrop.classList.remove("oculto");
 
-    // Actualizamos la URL para compartir
-    updateURLForProduct(producto.id);
-
-    // Cerrar
     const btnCerrar = document.getElementById("btn-cerrar-detalle");
     if (btnCerrar) btnCerrar.addEventListener("click", () => {
         cerrarDetalleProducto();
-        clearProductFromURL();
+        const url = new URL(window.location.href);
+        url.searchParams.delete("producto");
+        history.pushState({}, "", url.toString());
     });
 
-    // Compartir / copiar enlace
     const btnCompartir = document.getElementById("btn-compartir");
     if (btnCompartir) {
         btnCompartir.addEventListener("click", async () => {
@@ -536,9 +501,7 @@ function abrirDetalleProducto(idProducto) {
             if (navigator.share) {
                 try {
                     await navigator.share({ title, text, url: shareURL });
-                } catch (e) {
-                    // cancelado
-                }
+                } catch (e) {}
             } else if (navigator.clipboard && navigator.clipboard.writeText) {
                 try {
                     await navigator.clipboard.writeText(shareURL);
@@ -552,7 +515,6 @@ function abrirDetalleProducto(idProducto) {
         });
     }
 
-    // Botones de acción
     const btnAgregar = panel.querySelector(".btn-agregar:not(.btn-agotado)");
     if (btnAgregar) {
         btnAgregar.addEventListener("click", e => agregarAlCarrito(e.target.dataset.id));
@@ -563,7 +525,6 @@ function abrirDetalleProducto(idProducto) {
         btnComprarAhora.addEventListener("click", e => comprarAhora(e.target.dataset.id));
     }
 
-    // Carrusel
     if (hayCarrusel) {
         let indiceActual = 0;
         const imgEl = panel.querySelector("#detalle-imagen");
@@ -586,7 +547,6 @@ function abrirDetalleProducto(idProducto) {
             actualizarImagen();
         });
 
-        // Click en la imagen -> ampliar la imagen actual del carrusel
         imgEl.addEventListener("click", () => abrirImagenAmpliada(imagenes[indiceActual]));
     } else {
         const imgEl = panel.querySelector("#detalle-imagen");
@@ -599,8 +559,6 @@ function cerrarDetalleProducto() {
     const backdrop = document.getElementById("detalle-backdrop");
     if (panel) panel.classList.add("oculto");
     if (backdrop) backdrop.classList.add("oculto");
-    
-    // Al cerrar el detalle, revertimos las meta tags a los valores por defecto
     actualizarMetaTagsProducto(null); 
 }
 
@@ -616,7 +574,6 @@ function abrirImagenAmpliada(src) {
     img.src = src;
     backdrop.classList.remove("oculto");
 
-    // Cerramos al tocar el botón o el fondo
     btnCerrar.onclick = () => backdrop.classList.add("oculto");
     backdrop.onclick = (e) => {
         if (e.target === backdrop) {
@@ -653,43 +610,35 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     cargarCarrito();
     cargarMarcasEnFiltro();
-    renderProductos(productos);
+    
+    // FIJACIÓN AQUÍ: Ejecutar la función de filtrado al inicio en vez de pasar la lista cruda
+    aplicarFiltros(); 
+    
     actualizarCarritoUI();
     
-    // Si la URL ya trae ?producto=ID, abrimos ese detalle
     const inicialId = getProductIdFromURL();
     if (inicialId) {
         const existe = obtenerProductoPorId(inicialId);
         if (existe) {
-            // Actualizamos meta tags antes de abrir el modal (crucial para SEO/Sharing)
             actualizarMetaTagsProducto(existe); 
             abrirDetalleProducto(inicialId);
         } else {
-             // Si el ID no existe, aseguramos las meta tags por defecto
             actualizarMetaTagsProducto(null);
         }
     } else {
-        // Si no hay ID en URL, aseguramos las meta tags por defecto
         actualizarMetaTagsProducto(null);
     }
 
-
-    // Filtros
     const buscador = document.getElementById("buscador");
     const filtroMarca = document.getElementById("filtro-marca");
-    // INICIO DEL CAMBIO: Usar el ID correcto del filtro de alimentación
     const filtroAlimentacion = document.getElementById("filtro-alimentacion"); 
-    // FIN DEL CAMBIO
     const ordenPrecio = document.getElementById("orden-precio");
 
     if (buscador) buscador.addEventListener("input", aplicarFiltros);
     if (filtroMarca) filtroMarca.addEventListener("change", aplicarFiltros);
-    // INICIO DEL CAMBIO: Asignar listener al filtro de alimentación
     if (filtroAlimentacion) filtroAlimentacion.addEventListener("change", aplicarFiltros); 
-    // FIN DEL CAMBIO
     if (ordenPrecio) ordenPrecio.addEventListener("change", aplicarFiltros);
 
-    // Menú de filtros desplegable
     const btnToggleFiltros = document.getElementById("btn-toggle-filtros");
     const filtrosContenido = document.getElementById("filtros-contenido");
     if (btnToggleFiltros && filtrosContenido) {
@@ -698,7 +647,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // Clicks en lista de productos
     const listaProductos = document.getElementById("lista-productos");
     if (listaProductos) {
         listaProductos.addEventListener("click", (e) => {
@@ -722,7 +670,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
-    // Carrito
     const btnVerCarrito = document.getElementById("btn-ver-carrito");
     const btnCerrarCarrito = document.getElementById("btn-cerrar-carrito");
     const carritoBackdrop = document.getElementById("carrito-backdrop");
@@ -768,10 +715,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     const detalleBackdrop = document.getElementById("detalle-backdrop");
     if (detalleBackdrop) detalleBackdrop.addEventListener("click", () => {
         cerrarDetalleProducto();
-        clearProductFromURL();
+        const url = new URL(window.location.href);
+        url.searchParams.delete("producto");
+        history.pushState({}, "", url.toString());
     });
 
-    // Navegación del navegador (Back/Forward)
     window.addEventListener("popstate", () => {
         const pid = getProductIdFromURL();
         if (pid) {
@@ -782,7 +730,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         } else {
             cerrarDetalleProducto();
-            actualizarMetaTagsProducto(null); // Asegura que se reviertan los meta tags
+            actualizarMetaTagsProducto(null); 
         }
     });
 });
