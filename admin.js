@@ -647,10 +647,17 @@ async function confirmarVenta() {
 
         alert(`Venta confirmada exitosamente.`);
         
-        vaciarVenta();
-        renderTablaProductos();
-        renderEstadisticas();
-        cerrarVenta(); 
+        // --- CAMBIOS AQUÍ ---
+        vaciarVenta();               // Limpia los inputs y la lista del modal actual
+        renderTablaProductos();      // Refresca la tabla de fondo
+        renderEstadisticas();        // Refresca los KPI del panel
+        
+        // Quitamos 'cerrarVenta();' para mantener el modal abierto
+        // Y devolvemos el foco al input para escanear/buscar la próxima herramienta:
+        const inputScanner = document.getElementById('venta-input-codbarra');
+        if (inputScanner) {
+            inputScanner.focus();
+        }
 
     } catch (error) {
         console.error("Error en la transacción:", error);
